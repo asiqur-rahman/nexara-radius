@@ -21,7 +21,7 @@
 [![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
 [![Author](https://img.shields.io/badge/Author-Md.%20Asiqur%20Rahman%20Khan-0969da?style=flat-square&logo=github&logoColor=white)](https://github.com/asiqur-rahman)
 
-[What is Nexara?](#-what-is-nexara) · [Features](#-features) · [Quick Start](#-quick-start) · [Architecture](#-architecture) · [Configuration](#-configuration) · [API](#-api-reference) · [Deployment](#-production-deployment)
+[What is Nexara?](#-what-is-nexara) · [Features](#-features) · [Screenshots](#-screenshots) · [Quick Start](#-quick-start) · [Architecture](#-architecture) · [Configuration](#-configuration) · [API](#-api-reference) · [Deployment](#-production-deployment)
 
 ---
 
@@ -154,6 +154,8 @@ Every device that connects through Nexara is not just authenticated — it is *e
 | Feature | Details |
 |---|---|
 | **Real-time dashboard** | Live auth accept/reject trends, NAS status, active session counts |
+| **Access-Reject log** | Every failed authentication logged with username, MAC, and classified reason |
+| **Last connected tracking** | Per-user last Wi-Fi connection time + which device (MAC) made it |
 | **Live sessions view** | Search and disconnect active RADIUS sessions |
 | **NAS silence alerts** | Alert when an access point stops sending accounting data |
 | **Reject spike alerts** | Alert when failed authentications exceed a configurable threshold |
@@ -175,7 +177,7 @@ Every device that connects through Nexara is not just authenticated — it is *e
 
 | Feature | Details |
 |---|---|
-| **Role-based access** | Admin gets full dashboard, User gets self-service portal only |
+| **Role-based access** | Admin gets full dashboard (`/admin`), User gets self-service portal (`/portal`) only — hard-enforced at routing level |
 | **Admin self-protection** | Admin cannot change their own role or suspend their own account |
 | **Last-admin protection** | Cannot demote or delete the last remaining admin account |
 | **RADIUS IP Guard** | Optional allowlist restricting which NAS IPs may send RADIUS requests |
@@ -234,6 +236,15 @@ Every device that connects through Nexara is not just authenticated — it is *e
 - **RadiusPolicyService** is the only writer of `radcheck`, `radreply`, `radgroupcheck`, `radgroupreply`, `radusergroup`, and `nas`. All mutations are transactional with application tables.
 - **FreeRADIUS calls the API** via `rlm_rest` on every `authorize` and `post-auth` — no direct DB coupling between FreeRADIUS and the application schema.
 - **Platform settings** (CA, Telegram, cert subjects, NAC policy) live in the `platform_settings` table — configurable at runtime from the admin panel without restarting services.
+
+---
+
+## 📸 Screenshots
+
+### Admin Dashboard — Operations Overview
+![Nexara Admin Dashboard](docs/dashboard.png)
+
+> **Live authentication telemetry** — accept/reject trends over 24 hours, active session counts, NAS health, and real-time alerts. Left sidebar provides instant access to all sections: Users, Device Approvals, Sessions, Groups & Policy, NAS, Reject Log, Audit, and Settings.
 
 ---
 
