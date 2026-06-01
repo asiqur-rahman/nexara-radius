@@ -248,6 +248,13 @@ Every device that connects through Nexara is not just authenticated — it is *e
 
 ---
 
+### User Self-Service Portal
+![Nexara User Portal](docs/portal.png)
+
+> **Personal Wi-Fi portal** — users see their own connection status, manage registered devices, generate EAP-TLS certificates, configure MFA, and follow the step-by-step connection guide. Fully responsive with dark and light theme support.
+
+---
+
 ## 🚀 Quick Start
 
 ### Prerequisites
