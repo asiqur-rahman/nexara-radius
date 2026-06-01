@@ -70,7 +70,7 @@ const ListQuery = z.object({
 
 const include = {
   groups: { include: { group: true } },
-  devices: { select: { id: true, mac: true, label: true, status: true } },
+  devices: { select: { id: true, mac: true, label: true, status: true, lastSeenAt: true, manufacturer: true } },
 } satisfies Prisma.UserInclude;
 
 type UserWithGroups = Prisma.UserGetPayload<{ include: typeof include }>;
@@ -87,9 +87,18 @@ function toSummary(u: UserWithGroups): UserSummary {
     validUntil: u.validUntil?.toISOString() ?? null,
     mfaEnabled:  u.mfaEnabled,
     certEnabled: u.certEnabled,
-    lastLoginAt: u.lastLoginAt?.toISOString() ?? null,
+    lastLoginAt:     u.lastLoginAt?.toISOString() ?? null,
+    ...((): { lastConnectedAt: string | null; lastConnectedMac: string | null } => {
+      const latest = u.devices
+        .filter((d) => d.lastSeenAt !== null)
+        .sort((a, b) => b.lastSeenAt!.getTime() - a.lastSeenAt!.getTime())[0] ?? null;
+      return {
+        lastConnectedAt:  latest?.lastSeenAt?.toISOString() ?? null,
+        lastConnectedMac: latest?.mac ?? null,
+      };
+    })(),
     createdAt: u.createdAt.toISOString(),
-    groups: u.groups.map((g) => ({ id: g.group.id, name: g.group.name })),
+    groups:  u.groups.map((g) => ({ id: g.group.id, name: g.group.name })),
     devices: u.devices.map((d) => ({ id: d.id, mac: d.mac, label: d.label, status: d.status })),
   };
 }

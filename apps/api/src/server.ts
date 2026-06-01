@@ -28,6 +28,7 @@ import adminRadiusAllowlistRoutes from "./routes/admin/radiusAllowlist.js";
 import adminPlatformSettingsRoutes from "./routes/admin/platformSettings.js";
 import adminUserCertsRoutes from "./routes/admin/userCerts.js";
 import adminLdapRoutes from "./routes/admin/ldap.js";
+import adminRejectLogRoutes from "./routes/admin/rejectLog.js";
 import samlRoutes from "./routes/saml.js";
 import mfaRoutes from "./routes/mfa.js";
 import radiusRoutes from "./routes/radius.js";
@@ -92,6 +93,7 @@ export async function buildServer(opts: FastifyServerOptions = {}) {
       await api.register(adminPlatformSettingsRoutes, { prefix: "/admin" });
       await api.register(adminUserCertsRoutes, { prefix: "/admin" });
       await api.register(adminLdapRoutes, { prefix: "/admin" });
+      await api.register(adminRejectLogRoutes, { prefix: "/admin" });
       await api.register(samlRoutes);
       // FreeRADIUS rlm_rest hook — internal, protected by shared secret.
       await api.register(radiusRoutes, { prefix: "/radius" });

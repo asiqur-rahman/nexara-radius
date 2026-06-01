@@ -3,6 +3,7 @@
 // stays decoupled from React context.
 import type {
   AdminDeviceSummary,
+  RejectLogEntry,
   CaInfo,
   CertSubjectSettings,
   CreateGroupAttributeRequest,
@@ -226,6 +227,19 @@ export function disconnectAdminSession(token: string, id: string, reason?: strin
     token,
     body: reason ? { reason } : {},
   });
+}
+
+// -- Reject log --------------------------------------------------------------
+export function listRejectLog(
+  token: string,
+  q?: { page?: number; pageSize?: number; search?: string },
+) {
+  const params = new URLSearchParams();
+  if (q?.page)     params.set("page",     String(q.page));
+  if (q?.pageSize) params.set("pageSize", String(q.pageSize));
+  if (q?.search)   params.set("search",   q.search);
+  const qs = params.toString();
+  return api<Paginated<RejectLogEntry>>(`${v1}/admin/reject-log${qs ? `?${qs}` : ""}`, { token });
 }
 
 // -- Operations and observability -------------------------------------------

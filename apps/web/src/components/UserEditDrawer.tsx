@@ -635,12 +635,12 @@ export function UserEditDrawer({ user, groups, token, onClose, onSaved }: Props)
               ) : (
                 <div className="space-y-2">
                   {certs.map((cert) => {
-                    const revoked = Boolean(cert.revokedAt);
+                    const expired = new Date(cert.expiresAt) < new Date();
                     return (
                       <div
                         key={cert.id}
                         className={`flex items-center gap-3 rounded-[22px] border px-4 py-3 ${
-                          revoked
+                          expired
                             ? isWhiteTheme
                               ? "border-slate-200 bg-slate-50/70 opacity-55"
                               : "border-white/6 bg-white/[0.02] opacity-55"
@@ -649,21 +649,21 @@ export function UserEditDrawer({ user, groups, token, onClose, onSaved }: Props)
                               : "border-white/8 bg-white/[0.03]"
                         }`}
                       >
-                        <div className={`flex h-10 w-10 items-center justify-center rounded-2xl ${revoked ? isWhiteTheme ? "bg-slate-100 text-slate-500" : "bg-white/[0.03] text-slate-600" : "bg-sky-400/[0.08] text-sky-200"}`}>
+                        <div className={`flex h-10 w-10 items-center justify-center rounded-2xl ${expired ? isWhiteTheme ? "bg-slate-100 text-slate-500" : "bg-white/[0.03] text-slate-600" : "bg-sky-400/[0.08] text-sky-200"}`}>
                           <KeyRound className="h-4 w-4" />
                         </div>
                         <div className="min-w-0 flex-1">
                           <div className={`truncate font-mono text-xs ${isWhiteTheme ? "text-slate-700" : "text-slate-300"}`}>{cert.commonName}</div>
                           <div className={`mt-1 text-xs ${faintClass}`}>
-                            {revoked
-                              ? `Revoked ${new Date(cert.revokedAt!).toLocaleDateString()}`
+                            {expired
+                              ? `Expired ${new Date(cert.expiresAt).toLocaleDateString()}`
                               : `Expires ${new Date(cert.expiresAt).toLocaleDateString()}`}
                           </div>
                         </div>
-                        {!revoked ? (
+                        {!expired ? (
                           <button
                             type="button"
-                            title="Revoke certificate"
+                            title="Delete certificate"
                             onClick={() => void handleRevokeCert(cert.id)}
                             className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition ${isWhiteTheme ? "text-slate-500 hover:bg-rose-50 hover:text-rose-600" : "text-slate-500 hover:bg-rose-500/10 hover:text-rose-300"}`}
                           >

@@ -24,6 +24,8 @@ export interface UserSummary {
   mfaEnabled: boolean;
   certEnabled: boolean;
   lastLoginAt: string | null;
+  lastConnectedAt:  string | null;
+  lastConnectedMac: string | null;  // MAC of the device that last connected
   createdAt: string;
   groups: Array<{ id: string; name: string }>;
   devices: Array<{ id: string; mac: string; label: string | null; status: DeviceStatus }>;
@@ -282,6 +284,21 @@ export interface DeviceCertificateClearResponse extends DeviceCertificateMutatio
   alreadyCleared: boolean;
 }
 
+
+export interface RejectLogEntry {
+  id:            string;
+  username:      string;
+  mac:           string | null;       // Calling-Station-Id (client MAC)
+  calledStation: string | null;       // Called-Station-Id (AP / SSID)
+  reply:         string;              // FreeRADIUS reply string
+  reason:        string;              // Enriched reason derived from our DB
+  authDate:      string;              // ISO timestamp
+  // enriched from app DB
+  userId:        string | null;
+  fullName:      string | null;
+  deviceStatus:  string | null;       // approved / rejected / blocked / pending / null = unknown device
+  deviceLabel:   string | null;
+}
 
 export interface RadiusSession {
   id: string;

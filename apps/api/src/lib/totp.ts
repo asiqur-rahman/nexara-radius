@@ -61,7 +61,7 @@ export function createTotpEnrollment(username: string) {
   return {
     secret,
     encryptedSecret: encryptTotpSecret(secret),
-    otpauthUri: `otpauth://totp/RadiusOps:${encodeURIComponent(username)}?secret=${secret}&issuer=RadiusOps&algorithm=SHA1&digits=6&period=30`,
+    otpauthUri: `otpauth://totp/Nexara:${encodeURIComponent(username)}?secret=${secret}&issuer=Nexara&algorithm=SHA1&digits=6&period=30`,
   };
 }
 

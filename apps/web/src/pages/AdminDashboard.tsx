@@ -12,6 +12,7 @@ import {
   LogOut,
   Settings2,
   ShieldCheck,
+  ShieldOff,
   Smartphone,
   Sparkles,
   UsersRound,
@@ -25,6 +26,7 @@ import { useSSE } from "../hooks/useSSE";
 import { useTheme } from "../theme/ThemeContext";
 import { LiveAdminDocsView } from "../views/LiveAdminDocsView";
 import { LiveAuditView } from "../views/LiveAuditView";
+import { LiveRejectLogView } from "../views/LiveRejectLogView";
 import { LiveDeviceApprovalsView } from "../views/LiveDeviceApprovalsView";
 import { LiveGroupsView } from "../views/LiveGroupsView";
 import { LiveNasView } from "../views/LiveNasView";
@@ -40,6 +42,7 @@ type AdminView =
   | "sessions"
   | "groups"
   | "nas"
+  | "rejects"
   | "audit"
   | "docs"
   | "settings";
@@ -101,6 +104,13 @@ const navItems: NavItem[] = [
     icon: Cpu,
   },
   {
+    id: "rejects",
+    label: "Reject Log",
+    shortLabel: "Rejects",
+    description: "Access-Reject events",
+    icon: ShieldOff,
+  },
+  {
     id: "audit",
     label: "Audit",
     shortLabel: "Audit",
@@ -126,7 +136,7 @@ const navItems: NavItem[] = [
 const navGroups: Array<{ title: string; items: AdminView[] }> = [
   { title: "Command", items: ["overview", "users", "devices", "sessions"] },
   { title: "Access Control", items: ["groups", "nas"] },
-  { title: "Governance", items: ["audit", "docs", "settings"] },
+  { title: "Governance", items: ["rejects", "audit", "docs", "settings"] },
 ];
 
 function viewComponent(view: AdminView) {
@@ -143,6 +153,8 @@ function viewComponent(view: AdminView) {
       return <LiveGroupsView />;
     case "nas":
       return <LiveNasView />;
+    case "rejects":
+      return <LiveRejectLogView />;
     case "audit":
       return <LiveAuditView />;
     case "docs":

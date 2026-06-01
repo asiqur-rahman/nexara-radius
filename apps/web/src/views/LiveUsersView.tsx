@@ -223,9 +223,22 @@ export function LiveUsersView() {
                           </span>
                         </div>
 
+                        <div className="mt-2 flex items-start gap-1.5 text-xs text-slate-500">
+                          <CalendarClock className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" />
+                          <div>
+                            {user.lastConnectedAt
+                              ? new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(user.lastConnectedAt))
+                              : "Never connected"}
+                            {user.lastConnectedMac && (
+                              <div className="mt-0.5 font-mono text-[10px] uppercase tracking-wide text-slate-600">
+                                {user.lastConnectedMac}
+                              </div>
+                            )}
+                          </div>
+                        </div>
                         {user.validUntil && (
-                          <div className="mt-3 flex items-center gap-2 text-xs text-slate-500">
-                            <CalendarClock className="h-3.5 w-3.5" />
+                          <div className="mt-1 flex items-center gap-1.5 text-xs text-slate-500">
+                            <CalendarClock className="h-3.5 w-3.5 flex-shrink-0 text-amber-400" />
                             Expires {new Date(user.validUntil).toLocaleDateString()}
                           </div>
                         )}
@@ -262,6 +275,7 @@ export function LiveUsersView() {
                 <th className="px-4 py-3 font-medium">Groups</th>
                 <th className="px-4 py-3 font-medium">Devices</th>
                 <th className="px-4 py-3 font-medium">MFA</th>
+                <th className="px-4 py-3 font-medium">Last connected</th>
                 <th className="px-4 py-3 font-medium">Status</th>
                 <th className="px-4 py-3" />
               </tr>
@@ -309,6 +323,25 @@ export function LiveUsersView() {
                       <ShieldCheck className="h-4.5 w-4.5 text-emerald-300" />
                     ) : (
                       <span className="text-slate-600">—</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-4 text-xs text-slate-400">
+                    {user.lastConnectedAt ? (
+                      <div>
+                        <div className="font-medium text-slate-300">
+                          {new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(new Date(user.lastConnectedAt))}
+                        </div>
+                        <div className="mt-0.5 text-slate-500">
+                          {new Intl.DateTimeFormat(undefined, { timeStyle: "short" }).format(new Date(user.lastConnectedAt))}
+                        </div>
+                        {user.lastConnectedMac && (
+                          <div className="mt-1 font-mono text-[10px] uppercase tracking-wide text-slate-600">
+                            {user.lastConnectedMac}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-slate-600">Never</span>
                     )}
                   </td>
                   <td className="px-4 py-4">
