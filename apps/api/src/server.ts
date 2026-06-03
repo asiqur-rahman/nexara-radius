@@ -34,6 +34,7 @@ import mfaRoutes from "./routes/mfa.js";
 import radiusRoutes from "./routes/radius.js";
 import eventsRoutes from "./routes/events.js";
 import { Forbidden } from "./lib/errors.js";
+import { startCleanupScheduler } from "./lib/cleanup.js";
 
 export async function buildServer(opts: FastifyServerOptions = {}) {
   const c = config();
@@ -102,6 +103,9 @@ export async function buildServer(opts: FastifyServerOptions = {}) {
     },
     { prefix: "/api/v1" },
   );
+
+  // Start the daily history cleanup scheduler (runs at startup + every 24 h)
+  startCleanupScheduler();
 
   return app;
 }

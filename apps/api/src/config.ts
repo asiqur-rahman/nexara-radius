@@ -48,8 +48,11 @@ const schema = z.object({
   COA_DISCONNECT_ON_USER_POLICY_CHANGE: envBoolean.default(true),
   COA_DISCONNECT_ON_GROUP_POLICY_CHANGE: envBoolean.default(false),
 
-  ALERT_NAS_SILENT_MINUTES: z.coerce.number().int().positive().default(15),
-  ALERT_REJECT_THRESHOLD_5M: z.coerce.number().int().positive().default(20),
+  ALERT_NAS_SILENT_MINUTES:   z.coerce.number().int().positive().default(15),
+  ALERT_REJECT_THRESHOLD_5M:  z.coerce.number().int().positive().default(20),
+
+  // History auto-cleanup — records older than this many days are purged daily.
+  CLEANUP_RETENTION_DAYS: z.coerce.number().int().min(1).max(365).default(30),
 
   // CA is managed exclusively via the admin panel (Admin → Settings → CA Certificate).
   // No env-var CA loading — configuration lives in platform_settings (DB-backed).
