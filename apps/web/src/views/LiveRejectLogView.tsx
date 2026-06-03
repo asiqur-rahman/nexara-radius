@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 import {
-  AlertTriangle, Clock3, Loader2, RefreshCw, Search, ShieldOff,
+  AlertTriangle, Clock3, Loader2, RefreshCw, Search, ShieldOff, Trash2,
 } from "lucide-react";
 import type { RejectLogEntry } from "@app/shared";
-import { listRejectLog } from "../api/endpoints";
+import { clearRejectLog, listRejectLog } from "../api/endpoints";
 import { ApiCallError } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import { PageHelp } from "../components/PageHelp";
@@ -32,12 +32,14 @@ function fmtTime(iso: string) {
 
 export function LiveRejectLogView() {
   const { token } = useAuth();
-  const [entries,  setEntries]  = useState<RejectLogEntry[]>([]);
-  const [total,    setTotal]    = useState(0);
-  const [page,     setPage]     = useState(1);
-  const [query,    setQuery]    = useState("");
-  const [loading,  setLoading]  = useState(true);
-  const [error,    setError]    = useState<string | null>(null);
+  const [entries,      setEntries]      = useState<RejectLogEntry[]>([]);
+  const [total,        setTotal]        = useState(0);
+  const [page,         setPage]         = useState(1);
+  const [query,        setQuery]        = useState("");
+  const [loading,      setLoading]      = useState(true);
+  const [error,        setError]        = useState<string | null>(null);
+  const [confirmClear, setConfirmClear] = useState(false);
+  const [clearing,     setClearing]     = useState(false);
 
   const PAGE_SIZE = 50;
 
@@ -59,6 +61,18 @@ export function LiveRejectLogView() {
 
   const handleSearch = (v: string) => {
     setQuery(v); setPage(1); void load(1, v);
+  };
+
+  const handleClear = async () => {
+    if (!token) return;
+    setClearing(true); setError(null);
+    try {
+      const res = await clearRejectLog(token);
+      setEntries([]); setTotal(0); setPage(1); setConfirmClear(false);
+      setError(`✓ Cleared ${res.deleted} rejection record${res.deleted !== 1 ? "s" : ""}.`);
+    } catch (err) {
+      setError(err instanceof ApiCallError ? err.payload.message : "Failed to clear history");
+    } finally { setClearing(false); }
   };
 
   const totalPages = Math.ceil(total / PAGE_SIZE);
@@ -89,11 +103,33 @@ export function LiveRejectLogView() {
             {" · "}passwords are never logged
           </p>
         </div>
-        <button onClick={() => void load()}
-          className="inline-flex items-center justify-center gap-2 rounded-[20px] border border-white/8 bg-white/[0.04] px-4 py-3 text-sm font-medium text-slate-200 transition hover:bg-white/[0.08] hover:text-white">
-          <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-          Refresh
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={() => void load()}
+            className="inline-flex items-center gap-2 rounded-[20px] border border-white/8 bg-white/[0.04] px-4 py-3 text-sm font-medium text-slate-200 transition hover:bg-white/[0.08] hover:text-white">
+            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+            Refresh
+          </button>
+
+          {!confirmClear ? (
+            <button onClick={() => setConfirmClear(true)}
+              className="inline-flex items-center gap-2 rounded-[20px] border border-white/8 bg-white/[0.04] px-4 py-3 text-sm font-medium text-slate-400 transition hover:border-rose-500/30 hover:bg-rose-500/10 hover:text-rose-300">
+              <Trash2 className="h-4 w-4" />
+              Clear history
+            </button>
+          ) : (
+            <div className="flex items-center gap-2">
+              <button onClick={() => void handleClear()} disabled={clearing}
+                className="inline-flex items-center gap-2 rounded-[20px] bg-rose-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-rose-500 disabled:opacity-60">
+                {clearing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                {clearing ? "Clearing…" : "Confirm clear"}
+              </button>
+              <button onClick={() => setConfirmClear(false)}
+                className="rounded-[20px] border border-white/8 px-4 py-3 text-sm text-slate-400 hover:bg-white/[0.05]">
+                Cancel
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {error && (

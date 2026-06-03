@@ -53,6 +53,14 @@ const adminRejectLog: FastifyPluginAsync = async (app) => {
   app.addHook("preHandler", app.authenticate);
   app.addHook("preHandler", app.authorize(["admin"]));
 
+  // DELETE /admin/reject-log — wipe all Access-Reject entries from radpostauth
+  app.delete("/reject-log", async () => {
+    const result = await prisma.$executeRawUnsafe(
+      `DELETE FROM radpostauth WHERE reply ILIKE '%reject%'`,
+    );
+    return { ok: true, deleted: result };
+  });
+
   app.get("/reject-log", async (req) => {
     const query = ListQuery.parse(req.query);
     const offset = (query.page - 1) * query.pageSize;

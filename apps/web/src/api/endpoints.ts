@@ -230,6 +230,9 @@ export function disconnectAdminSession(token: string, id: string, reason?: strin
 }
 
 // -- Reject log --------------------------------------------------------------
+export function clearRejectLog(token: string) {
+  return api<{ ok: true; deleted: number }>(`${v1}/admin/reject-log`, { method: "DELETE", token });
+}
 export function listRejectLog(
   token: string,
   q?: { page?: number; pageSize?: number; search?: string },
