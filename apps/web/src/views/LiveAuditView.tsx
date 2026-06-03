@@ -1,18 +1,21 @@
 import { useEffect, useState } from "react";
-import { FileText, ShieldAlert } from "lucide-react";
+import { FileText, Loader2, ShieldAlert, Trash2 } from "lucide-react";
 import type { AuthenticationEvent, AuditLogEntry } from "@app/shared";
-import { listAuditLogs, listAuthenticationEvents } from "../api/endpoints";
+import { clearAuditLogs, listAuditLogs, listAuthenticationEvents } from "../api/endpoints";
+import { ApiCallError } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import { PageHelp } from "../components/PageHelp";
 
 export function LiveAuditView() {
   const { token } = useAuth();
-  const [tab, setTab] = useState<"audit" | "auth">("audit");
-  const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
-  const [authEvents, setAuthEvents] = useState<AuthenticationEvent[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const [tab,          setTab]          = useState<"audit" | "auth">("audit");
+  const [auditLogs,    setAuditLogs]    = useState<AuditLogEntry[]>([]);
+  const [authEvents,   setAuthEvents]   = useState<AuthenticationEvent[]>([]);
+  const [error,        setError]        = useState<string | null>(null);
+  const [confirmClear, setConfirmClear] = useState(false);
+  const [clearing,     setClearing]     = useState(false);
 
-  useEffect(() => {
+  const load = () => {
     if (!token) return;
     Promise.all([listAuditLogs(token), listAuthenticationEvents(token)])
       .then(([audit, auth]) => {
@@ -20,7 +23,21 @@ export function LiveAuditView() {
         setAuthEvents(auth.items);
       })
       .catch((err: Error) => setError(err.message));
-  }, [token]);
+  };
+
+  useEffect(() => { load(); }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleClear = async () => {
+    if (!token) return;
+    setClearing(true); setError(null);
+    try {
+      const res = await clearAuditLogs(token);
+      setAuditLogs([]); setConfirmClear(false);
+      setError(`✓ Cleared ${res.deleted} audit record${res.deleted !== 1 ? "s" : ""}.`);
+    } catch (err) {
+      setError(err instanceof ApiCallError ? err.payload.message : "Failed to clear audit log");
+    } finally { setClearing(false); }
+  };
 
   return (
     <div className="space-y-4">
@@ -32,9 +49,34 @@ export function LiveAuditView() {
           </div>
           <p className="theme-text-muted mt-0.5 text-sm">Administrative changes and RADIUS/web access outcomes</p>
         </div>
-        <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-1 flex">
-          <button onClick={() => setTab("audit")} className={`px-3 py-2 text-xs rounded-md ${tab === "audit" ? "bg-indigo-600 text-white" : "text-zinc-400"}`}>Audit log</button>
-          <button onClick={() => setTab("auth")} className={`px-3 py-2 text-xs rounded-md ${tab === "auth" ? "bg-indigo-600 text-white" : "text-zinc-400"}`}>Auth events</button>
+        <div className="flex items-center gap-2">
+          {/* Tab switcher */}
+          <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-1 flex">
+            <button onClick={() => setTab("audit")} className={`px-3 py-2 text-xs rounded-md ${tab === "audit" ? "bg-indigo-600 text-white" : "text-zinc-400"}`}>Audit log</button>
+            <button onClick={() => setTab("auth")}  className={`px-3 py-2 text-xs rounded-md ${tab === "auth"  ? "bg-indigo-600 text-white" : "text-zinc-400"}`}>Auth events</button>
+          </div>
+
+          {/* Clear history — two-step confirm */}
+          {tab === "audit" && (
+            !confirmClear ? (
+              <button onClick={() => setConfirmClear(true)}
+                className="inline-flex items-center gap-2 rounded-[18px] border border-white/8 bg-white/[0.04] px-3 py-2.5 text-xs font-medium text-slate-400 transition hover:border-rose-500/30 hover:bg-rose-500/10 hover:text-rose-300">
+                <Trash2 className="h-3.5 w-3.5" />Clear history
+              </button>
+            ) : (
+              <div className="flex items-center gap-2">
+                <button onClick={() => void handleClear()} disabled={clearing}
+                  className="inline-flex items-center gap-1.5 rounded-[18px] bg-rose-600 px-3 py-2.5 text-xs font-semibold text-white transition hover:bg-rose-500 disabled:opacity-60">
+                  {clearing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                  {clearing ? "Clearing…" : "Confirm clear"}
+                </button>
+                <button onClick={() => setConfirmClear(false)}
+                  className="rounded-[18px] border border-white/8 px-3 py-2.5 text-xs text-slate-400 hover:bg-white/[0.05]">
+                  Cancel
+                </button>
+              </div>
+            )
+          )}
         </div>
       </div>
       {error && <div className="text-rose-300 border border-rose-900 rounded-lg px-4 py-3 text-sm">{error}</div>}

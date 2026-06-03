@@ -192,6 +192,11 @@ const adminOperations: FastifyPluginAsync = async (app) => {
     return body;
   });
 
+  app.delete("/audit-logs", async () => {
+    const result = await prisma.auditLog.deleteMany({});
+    return { ok: true, deleted: result.count };
+  });
+
   app.get("/audit-logs", async (req) => {
     const q = PageQuery.parse(req.query);
     const [entries, total] = await Promise.all([

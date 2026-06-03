@@ -249,6 +249,9 @@ export function listRejectLog(
 export function getOperationsOverview(token: string) {
   return api<OperationsOverview>(`${v1}/admin/operations/overview`, { token });
 }
+export function clearAuditLogs(token: string) {
+  return api<{ ok: true; deleted: number }>(`${v1}/admin/audit-logs`, { method: "DELETE", token });
+}
 export function listAuditLogs(token: string, pageSize = 50) {
   return api<Paginated<AuditLogEntry>>(`${v1}/admin/audit-logs?pageSize=${pageSize}`, { token });
 }
