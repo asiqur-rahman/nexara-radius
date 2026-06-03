@@ -23,7 +23,11 @@ const UpdateDeviceBody = z
   .refine((body) => body.label !== undefined || body.isPrimary !== undefined, "No device change provided");
 
 const DeleteDeviceBody = z.object({ currentPassword: z.string().min(1) });
-const MAX_DEVICES = 5;
+
+async function getMaxDevices(): Promise<number> {
+  const row = await prisma.platformSetting.findUnique({ where: { key: "nac.max_devices_per_user" } });
+  return row ? (parseInt(row.value, 10) || 3) : 3;
+}
 
 function toDevice(device: DeviceRecord, observedAt?: Date | null): UserDevice {
   return {
@@ -81,9 +85,10 @@ const meDevices: FastifyPluginAsync = async (app) => {
     const mac = normalizeMac(body.mac);
     await assertPassword(userId, body.currentPassword);
 
+    const maxDevices = await getMaxDevices();
     const device = await prisma.$transaction(async (tx) => {
       const count = await tx.userDevice.count({ where: { userId } });
-      if (count >= MAX_DEVICES) throw BadRequest(`You can register up to ${MAX_DEVICES} devices`);
+      if (count >= maxDevices) throw BadRequest(`You can register up to ${maxDevices} device${maxDevices !== 1 ? "s" : ""}.`);
       const existing = await tx.userDevice.findUnique({ where: { userId_mac: { userId, mac } } });
       if (existing) throw Conflict("This MAC address is already registered");
 

@@ -300,6 +300,7 @@ export function updatePlatformSettings(
     ca?: UpdateCaRequest;
     certSettings?: UpdateCertSettingsRequest;
     freeradius?: { reloadCommand?: string | null };
+    nac?: { maxDevicesPerUser?: number };
   },
 ) {
   return api<PlatformSettingsResponse>(`${v1}/admin/settings/platform`, {

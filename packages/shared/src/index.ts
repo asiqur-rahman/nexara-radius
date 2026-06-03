@@ -475,6 +475,9 @@ export interface PlatformSettingsResponse {
     reloadCommand: string | null;
     configured:    boolean;
   };
+  nac: {
+    maxDevicesPerUser: number;  // default 3
+  };
 }
 
 export interface UpdateCaRequest {

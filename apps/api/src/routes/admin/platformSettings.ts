@@ -71,19 +71,34 @@ const PatchBody = z.object({
       reloadCommand: z.string().max(500).nullable().optional(),
     })
     .optional(),
+
+  nac: z
+    .object({
+      maxDevicesPerUser: z.coerce.number().int().min(1).max(50).optional(),
+    })
+    .optional(),
 });
 
 const adminPlatformSettings: FastifyPluginAsync = async (app) => {
   app.addHook("preHandler", app.authenticate);
   app.addHook("preHandler", app.authorize(["admin"]));
 
+  // Helper: read NAC settings from DB
+  async function getNacSettings() {
+    const row = await prisma.platformSetting.findUnique({ where: { key: "nac.max_devices_per_user" } });
+    return {
+      maxDevicesPerUser: row ? (parseInt(row.value, 10) || 3) : 3,
+    };
+  }
+
   // ── GET /admin/settings/platform ────────────────────────────────
   app.get("/settings/platform", async () => {
-    const [tg, caInfo, certSettings, reloadCmd] = await Promise.all([
+    const [tg, caInfo, certSettings, reloadCmd, nac] = await Promise.all([
       getTelegramSettings(),
       getCaInfo(),
       getCertSettings(),
       getReloadCommand(),
+      getNacSettings(),
     ]);
     return {
       telegram: {
@@ -97,6 +112,7 @@ const adminPlatformSettings: FastifyPluginAsync = async (app) => {
         reloadCommand: reloadCmd,
         configured:    Boolean(reloadCmd),
       },
+      nac,
     };
   });
 
@@ -169,11 +185,21 @@ const adminPlatformSettings: FastifyPluginAsync = async (app) => {
       await saveReloadCommand(body.freeradius.reloadCommand ?? null);
     }
 
-    const [tg, caInfo, certSettings, reloadCmd] = await Promise.all([
+    // ── NAC settings ──────────────────────────────────────────────
+    if (body.nac?.maxDevicesPerUser !== undefined) {
+      await prisma.platformSetting.upsert({
+        where:  { key: "nac.max_devices_per_user" },
+        create: { key: "nac.max_devices_per_user", value: String(body.nac.maxDevicesPerUser) },
+        update: { value: String(body.nac.maxDevicesPerUser) },
+      });
+    }
+
+    const [tg, caInfo, certSettings, reloadCmd, nac] = await Promise.all([
       getTelegramSettings(),
       getCaInfo(),
       getCertSettings(),
       getReloadCommand(),
+      getNacSettings(),
     ]);
     return reply.status(200).send({
       telegram: {
@@ -187,6 +213,7 @@ const adminPlatformSettings: FastifyPluginAsync = async (app) => {
         reloadCommand: reloadCmd,
         configured:    Boolean(reloadCmd),
       },
+      nac,
     });
   });
 };

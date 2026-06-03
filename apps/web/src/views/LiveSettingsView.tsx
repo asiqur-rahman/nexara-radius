@@ -1472,6 +1472,77 @@ function FreeRadiusPanel({ token }: { token: string }) {
   );
 }
 
+// ── NAC Panel ──────────────────────────────────────────────────────────────
+
+function NacPanel({ token }: { token: string }) {
+  const [maxDevices, setMaxDevices] = useState<string>("3");
+  const [busy,       setBusy]       = useState(false);
+  const [notice,     setNotice]     = useState<{ ok: boolean; text: string } | null>(null);
+
+  useEffect(() => {
+    getPlatformSettings(token)
+      .then((s) => setMaxDevices(String(s.nac?.maxDevicesPerUser ?? 3)))
+      .catch(() => {});
+  }, [token]);
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const val = parseInt(maxDevices, 10);
+    if (isNaN(val) || val < 1 || val > 50) {
+      setNotice({ ok: false, text: "Enter a number between 1 and 50." });
+      return;
+    }
+    setBusy(true); setNotice(null);
+    try {
+      await updatePlatformSettings(token, { nac: { maxDevicesPerUser: val } });
+      setNotice({ ok: true, text: `Limit updated to ${val} device${val !== 1 ? "s" : ""} per user.` });
+    } catch (err) {
+      setNotice({ ok: false, text: err instanceof Error ? err.message : "Failed to save." });
+    } finally { setBusy(false); }
+  };
+
+  return (
+    <section className="rounded-[28px] border border-white/8 bg-white/[0.03] px-5 py-5">
+      <div className="mb-5 flex items-center gap-3">
+        <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-violet-500/15">
+          <Users className="h-4.5 w-4.5 text-violet-300" />
+        </div>
+        <div>
+          <div className="text-[11px] uppercase tracking-[0.28em] text-slate-500">NAC Policy</div>
+          <div className="mt-1 text-base font-semibold text-white">Device limit per user</div>
+        </div>
+      </div>
+
+      {notice && (
+        <div className={`mb-4 rounded-[18px] border px-4 py-3 text-sm ${notice.ok ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-200" : "border-rose-500/20 bg-rose-500/10 text-rose-200"}`}>
+          {notice.text}
+        </div>
+      )}
+
+      <form onSubmit={handleSave} className="flex flex-col gap-4 sm:flex-row sm:items-end">
+        <div className="flex-1 max-w-xs">
+          <label className="mb-2 block text-[11px] font-medium uppercase tracking-[0.24em] text-slate-500">
+            Max devices per user
+          </label>
+          <input
+            type="number" min={1} max={50} value={maxDevices}
+            onChange={(e) => setMaxDevices(e.target.value)}
+            className="w-full rounded-[20px] border border-white/8 bg-slate-950/70 px-4 py-3 text-sm text-white outline-none focus:border-sky-400/40"
+          />
+          <p className="mt-1.5 text-xs text-slate-500">
+            Default is 3. Users cannot register more than this many devices. Range: 1–50.
+          </p>
+        </div>
+        <button disabled={busy}
+          className="inline-flex items-center gap-2 rounded-[20px] bg-sky-400 px-5 py-3 text-sm font-semibold text-slate-950 transition hover:brightness-105 disabled:opacity-60">
+          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+          Save
+        </button>
+      </form>
+    </section>
+  );
+}
+
 // ── Main Settings view ─────────────────────────────────────────────────────
 
 export function LiveSettingsView() {
@@ -1491,6 +1562,7 @@ export function LiveSettingsView() {
         </p>
       </div>
 
+      <NacPanel token={token} />
       <CaPanel token={token} />
       <CertSettingsPanel token={token} />
       <FreeRadiusPanel token={token} />
