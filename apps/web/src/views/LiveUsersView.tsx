@@ -11,14 +11,15 @@ import {
   UserRound,
   X,
 } from "lucide-react";
-import type { AdminDeviceSummary, GroupSummary, UserSummary } from "@app/shared";
 import { ApiCallError } from "../api/client";
+import type { AdminDeviceSummary, GroupSummary, UserSummary } from "@app/shared";
 import { CreateUserDrawer } from "../components/CreateUserDrawer";
 import { PageHelp } from "../components/PageHelp";
 import { UserEditDrawer } from "../components/UserEditDrawer";
 import { useAuth } from "../auth/AuthContext";
 import {
   deleteAdminDevice,
+  deleteUser,
   listGroups,
   listUserDevicesForAdmin,
   listUsers,
@@ -48,8 +49,10 @@ export function LiveUsersView() {
   const [query, setQuery] = useState("");
   const [showAdd, setShowAdd] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const [editTarget, setEditTarget] = useState<UserSummary | null>(null);
-  const [devicesUser, setDevicesUser] = useState<UserSummary | null>(null);
+  const [editTarget,   setEditTarget]   = useState<UserSummary | null>(null);
+  const [devicesUser,  setDevicesUser]  = useState<UserSummary | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<UserSummary | null>(null);
+  const [deleting,     setDeleting]     = useState(false);
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -71,6 +74,19 @@ export function LiveUsersView() {
     setUsers((previous) => [created, ...previous]);
     setShowAdd(false);
     setMessage(`User ${created.username} created successfully.`);
+  };
+
+  const handleDelete = async (user: UserSummary) => {
+    if (!token) return;
+    setDeleting(true);
+    try {
+      await deleteUser(token, user.id);
+      setUsers((prev) => prev.filter((u) => u.id !== user.id));
+      setDeleteTarget(null);
+      setMessage(`User "${user.username}" deleted.`);
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Failed to delete user.");
+    } finally { setDeleting(false); }
   };
 
   const handleSaved = (updated: UserSummary) => {
@@ -246,18 +262,17 @@ export function LiveUsersView() {
                     </button>
 
                     <div className="mt-3 flex items-center gap-2 pl-[3.75rem]">
-                      <button
-                        onClick={() => setDevicesUser(user)}
-                        className="inline-flex items-center gap-1.5 rounded-[16px] border border-white/8 px-3 py-2 text-xs font-medium text-slate-300 transition hover:bg-white/[0.05] hover:text-white"
-                      >
-                        <Smartphone className="h-3.5 w-3.5" />
-                        Devices
+                      <button onClick={() => setDevicesUser(user)}
+                        className="inline-flex items-center gap-1.5 rounded-[16px] border border-white/8 px-3 py-2 text-xs font-medium text-slate-300 transition hover:bg-white/[0.05] hover:text-white">
+                        <Smartphone className="h-3.5 w-3.5" />Devices
                       </button>
-                      <button
-                        onClick={() => setEditTarget(user)}
-                        className="rounded-[16px] border border-white/8 px-3 py-2 text-xs font-medium text-slate-200 transition hover:bg-white/[0.05] hover:text-white"
-                      >
+                      <button onClick={() => setEditTarget(user)}
+                        className="rounded-[16px] border border-white/8 px-3 py-2 text-xs font-medium text-slate-200 transition hover:bg-white/[0.05] hover:text-white">
                         Edit
+                      </button>
+                      <button onClick={() => setDeleteTarget(user)}
+                        className="rounded-[16px] border border-white/8 px-3 py-2 text-xs font-medium text-rose-400 transition hover:bg-rose-500/10 hover:border-rose-500/20">
+                        <Trash2 className="h-3.5 w-3.5" />
                       </button>
                     </div>
                   </div>
@@ -357,18 +372,17 @@ export function LiveUsersView() {
                   </td>
                   <td className="px-4 py-4 text-right">
                     <div className="flex items-center justify-end gap-2">
-                      <button
-                        onClick={() => setDevicesUser(user)}
-                        className="inline-flex items-center gap-1.5 rounded-[18px] border border-white/8 px-3 py-2 text-xs font-medium text-slate-300 transition hover:bg-white/[0.05] hover:text-white"
-                      >
-                        <Smartphone className="h-3.5 w-3.5" />
-                        Devices
+                      <button onClick={() => setDevicesUser(user)}
+                        className="inline-flex items-center gap-1.5 rounded-[18px] border border-white/8 px-3 py-2 text-xs font-medium text-slate-300 transition hover:bg-white/[0.05] hover:text-white">
+                        <Smartphone className="h-3.5 w-3.5" />Devices
                       </button>
-                      <button
-                        onClick={() => setEditTarget(user)}
-                        className="rounded-[18px] border border-white/8 px-3 py-2 text-xs font-medium text-slate-200 transition hover:bg-white/[0.05] hover:text-white"
-                      >
+                      <button onClick={() => setEditTarget(user)}
+                        className="rounded-[18px] border border-white/8 px-3 py-2 text-xs font-medium text-slate-200 transition hover:bg-white/[0.05] hover:text-white">
                         Edit
+                      </button>
+                      <button onClick={() => setDeleteTarget(user)}
+                        className="rounded-[18px] border border-white/8 px-3 py-2 text-xs font-medium text-rose-400 transition hover:bg-rose-500/10 hover:border-rose-500/20">
+                        <Trash2 className="h-3.5 w-3.5" />
                       </button>
                     </div>
                   </td>
@@ -399,6 +413,38 @@ export function LiveUsersView() {
             );
           }}
         />
+      )}
+
+      {/* Delete confirmation modal */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 backdrop-blur-sm px-4">
+          <div className="surface-dark-strong w-full max-w-md rounded-[32px] border border-white/8 px-6 py-6">
+            <div className="flex items-start gap-4">
+              <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl bg-rose-500/15 text-rose-300">
+                <Trash2 className="h-5 w-5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <h3 className="text-base font-semibold text-white">Delete user?</h3>
+                <p className="mt-1.5 text-sm text-slate-400">
+                  This permanently removes{" "}
+                  <span className="font-mono font-semibold text-white">{deleteTarget.username}</span>{" "}
+                  and all their devices, certificates, and group memberships. This cannot be undone.
+                </p>
+              </div>
+            </div>
+            <div className="mt-5 flex items-center justify-end gap-3">
+              <button onClick={() => setDeleteTarget(null)}
+                className="rounded-[18px] border border-white/8 px-4 py-2.5 text-sm text-slate-300 transition hover:bg-white/[0.05]">
+                Cancel
+              </button>
+              <button onClick={() => void handleDelete(deleteTarget)} disabled={deleting}
+                className="inline-flex items-center gap-2 rounded-[18px] bg-rose-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-rose-500 disabled:opacity-60">
+                {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                {deleting ? "Deleting…" : "Delete permanently"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

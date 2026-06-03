@@ -330,13 +330,15 @@ const adminUsers: FastifyPluginAsync = async (app) => {
     return { ok: true };
   });
 
-  // DELETE /admin/users/:id  — soft-delete by suspending.
-  // Hard delete deferred per architecture doc (audit retention).
+  // DELETE /admin/users/:id  — hard delete with RADIUS cleanup.
   app.delete<{ Params: { id: string } }>("/users/:id", async (req) => {
     const actorId = req.currentUser!.sub;
     const { id } = req.params;
 
     if (id === actorId) throw BadRequest("Cannot delete your own account.");
+
+    // Disconnect active sessions before removing the user
+    await disconnectForPolicyChange({ userId: id, actorId, reason: "user_deleted", req });
 
     await prisma.$transaction(async (tx) => {
       const existing = await tx.user.findUnique({ where: { id } });
@@ -352,27 +354,22 @@ const adminUsers: FastifyPluginAsync = async (app) => {
         }
       }
 
-      await tx.user.update({ where: { id }, data: { status: "suspended" } });
-      await syncUserToRadius(tx, id);
+      // Purge RADIUS rows before deleting the user
+      await purgeRadiusUsername(tx, existing.username);
+
+      // Hard delete — cascades to devices, certs, groups, secret
+      await tx.user.delete({ where: { id } });
+
       await audit({
         tx,
         actorId,
-        action: "user_delete",
+        action:     "user_delete",
         targetType: "user",
-        targetId: id,
-        metadata: { soft: true, username: existing.username },
+        targetId:   id,
+        metadata:   { username: existing.username },
         req,
       });
     });
-
-    if (config().COA_DISCONNECT_ON_USER_POLICY_CHANGE) {
-      await disconnectForPolicyChange({
-        userId: id,
-        actorId,
-        reason: "user_suspended",
-        req,
-      });
-    }
 
     return { ok: true };
   });
