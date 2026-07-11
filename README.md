@@ -292,11 +292,8 @@ MFA_ENCRYPTION_KEY=<random 32+ chars>
 
 ```bash
 # Postgres + FreeRADIUS + API + Web (full stack)
-docker compose up -d
-
-# Run database migrations and seed the first admin account
-pnpm db:deploy
-pnpm db:seed
+# First boot: API entrypoint applies migrations and seeds the admin automatically
+docker compose up -d --build
 ```
 
 ### 3 — Open the dashboard
@@ -307,6 +304,8 @@ http://localhost:8123
 
 Default credentials: `asiq` / `@Shik`  
 **Change immediately** in Admin → Users → Edit.
+
+Re-seed manually only if needed: `pnpm db:seed`
 
 ### 4 — Point your access point
 

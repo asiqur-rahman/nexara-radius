@@ -3,12 +3,11 @@
 ## Deployment
 
 1. Populate `.env` with production secrets, public `CORS_ORIGINS`, `COOKIE_SECURE=true`, and a unique `MFA_ENCRYPTION_KEY`. Keep `REQUIRE_ADMIN_MFA=false` only for initial bootstrap.
-2. Start infrastructure: `docker compose -f docker-compose.yml -f docker-compose.production.yml up -d postgres freeradius`.
-3. Install dependencies and apply application migrations: `pnpm install --frozen-lockfile` then `pnpm db:deploy`.
-4. Seed only for a new installation: set `SEED_ADMIN_PASSWORD` to a strong temporary value, then run `pnpm db:seed`.
-5. Start the API and web containers: `pnpm docker:prod:up`.
-6. Sign in as the bootstrap administrator, enroll authenticator MFA, set `REQUIRE_ADMIN_MFA=true`, restart the API, and confirm administrator sign-in requires a code.
-7. Confirm `/health/ready`, portal login, a test RADIUS authentication, accounting arrival, and CoA against a test session.
+2. Start the full stack: `docker compose up -d --build`. The API entrypoint applies migrations and, on first boot (no admin yet), seeds bootstrap users from the baked-in `seed.config.json.example` defaults (`asiq` / `@Shik`).
+3. Sign in as the bootstrap administrator, enroll authenticator MFA, set `REQUIRE_ADMIN_MFA=true`, restart the API, and confirm administrator sign-in requires a code.
+4. Confirm `/health/ready`, portal login, a test RADIUS authentication, accounting arrival, and CoA against a test session.
+
+To override seed credentials before first boot, copy `apps/api/prisma/seed.config.json.example` to `seed.config.json`, edit it, rebuild the API image (or mount the file — only if the host file already exists), then bring the stack up.
 
 For lab acceptance against a real AP and supplicant, follow [`FIELD_VALIDATION.md`](./FIELD_VALIDATION.md).
 

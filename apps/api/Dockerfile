@@ -27,6 +27,9 @@ COPY --from=build /app/apps/api/dist ./apps/api/dist
 COPY --from=build /app/apps/api/node_modules ./apps/api/node_modules
 COPY --from=build /app/apps/api/prisma ./apps/api/prisma
 COPY --from=build /app/apps/api/package.json ./apps/api/package.json
+# Bake default seed credentials into the image (asiq / @Shik from the example).
+# Operators can override at runtime by mounting their own seed.config.json.
+RUN cp ./apps/api/prisma/seed.config.json.example ./apps/api/prisma/seed.config.json
 COPY apps/api/docker-entrypoint.sh ./docker-entrypoint.sh
 RUN chmod +x docker-entrypoint.sh
 WORKDIR /app/apps/api

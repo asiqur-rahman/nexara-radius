@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { PrismaClient } from "@prisma/client";
@@ -6,9 +6,24 @@ import { hashPassword, ntHash } from "../lib/password.js";
 import { syncGroupToRadius, syncNasToRadius, syncUserToRadius } from "../services/radiusPolicy.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const seedConfig = JSON.parse(
-  readFileSync(resolve(__dirname, "../../prisma/seed.config.json"), "utf8")
-);
+const prismaDir = resolve(__dirname, "../../prisma");
+
+function loadSeedConfig() {
+  const primary = resolve(prismaDir, "seed.config.json");
+  const fallback = resolve(prismaDir, "seed.config.json.example");
+  const path =
+    existsSync(primary) && statSync(primary).isFile() ? primary
+    : existsSync(fallback) && statSync(fallback).isFile() ? fallback
+    : null;
+  if (!path) {
+    throw new Error(
+      `Seed config not found. Expected a file at ${primary} or ${fallback}.`
+    );
+  }
+  return JSON.parse(readFileSync(path, "utf8"));
+}
+
+const seedConfig = loadSeedConfig();
 
 const prisma = new PrismaClient();
 

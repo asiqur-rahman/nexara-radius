@@ -29,7 +29,9 @@ services:
       postgres:
         condition: service_healthy
     volumes:
-      - ./apps/api/prisma/seed.config.json:/app/apps/api/prisma/seed.config.json:ro
+      # Optional: mount your own seed override. Do NOT mount a missing host path —
+      # Docker will create a directory and break first-boot seed.
+      # - ./apps/api/prisma/seed.config.json:/app/apps/api/prisma/seed.config.json:ro
       - ./infra/freeradius/raddb/certs:/etc/raddb/certs-src:ro
     expose:
       - "4000"
