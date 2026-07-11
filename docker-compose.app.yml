@@ -14,7 +14,7 @@ services:
       context: .
       dockerfile: apps/api/Dockerfile
     image: radius-platform/api:production
-    container_name: radius-api
+    container_name: nexara-api
     restart: unless-stopped
     env_file:
       - .env
@@ -45,7 +45,7 @@ services:
       context: .
       dockerfile: apps/web/Dockerfile
     image: radius-platform/web:production
-    container_name: radius-web
+    container_name: nexara-web
     restart: unless-stopped
     depends_on:
       api:

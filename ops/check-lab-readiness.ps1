@@ -259,12 +259,12 @@ function Invoke-PostgresScalar {
   $output = $null
 
   if ($script:DockerRuntime.Mode -eq "native") {
-    $output = & docker exec radius-postgres env "PGPASSWORD=$Password" psql -h 127.0.0.1 -U $User -d $Database -tAc $Sql 2>$null
+    $output = & docker exec nexara-postgres env "PGPASSWORD=$Password" psql -h 127.0.0.1 -U $User -d $Database -tAc $Sql 2>$null
   } elseif ($script:DockerRuntime.Mode -eq "wsl") {
     $result = Invoke-ExternalCommand -FilePath "wsl.exe" -Arguments @(
       "docker",
       "exec",
-      "radius-postgres",
+      "nexara-postgres",
       "env",
       "PGPASSWORD=$Password",
       "psql",
@@ -296,9 +296,9 @@ function Invoke-ApiHealthFallback {
 
   try {
     if ($script:DockerRuntime.Mode -eq "native") {
-      $output = & docker exec freeradius-api-1 wget -q -O - http://127.0.0.1:4000/health/ready 2>$null
+      $output = & docker exec nexara-api wget -q -O - http://127.0.0.1:4000/health/ready 2>$null
     } else {
-      $bashCommand = "docker exec freeradius-api-1 wget -q -O - http://127.0.0.1:4000/health/ready"
+      $bashCommand = "docker exec nexara-api wget -q -O - http://127.0.0.1:4000/health/ready"
       $output = & wsl.exe bash -lc $bashCommand 2>$null
     }
 

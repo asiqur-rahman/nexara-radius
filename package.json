@@ -31,7 +31,7 @@
     "db:status": "pnpm --filter @app/api run prisma:status",
     "db:deploy": "pnpm --filter @app/api run prisma:deploy",
     "db:generate": "pnpm --filter @app/api run prisma:generate",
-    "db:seed": "docker exec radius-api node --openssl-legacy-provider prisma/seed.mjs",
+    "db:seed": "docker exec nexara-api node --openssl-legacy-provider prisma/seed.mjs",
     "lab:check": "node ops/check-lab-readiness.mjs",
     "lab:config": "node ops/print-lab-config.mjs",
     "lab:device-ca": "node ops/generate-dev-device-ca.mjs",

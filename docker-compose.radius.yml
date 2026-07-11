@@ -17,7 +17,7 @@ services:
       context: ./infra/freeradius
       dockerfile: Dockerfile
     image: radius-platform/freeradius:production
-    container_name: radius-freeradius
+    container_name: nexara-radius
     restart: unless-stopped
     # foreground mode — logs stream to `docker compose logs freeradius`.
     # Change to ["radiusd", "-X"] temporarily for verbose debug output.

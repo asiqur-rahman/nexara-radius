@@ -46,7 +46,7 @@ pnpm db:seed
 
 By default, seed now creates:
 
-- admin user: `admin` / `admin1234!`
+- admin user: `asiq` / `@Shik`
 - PEAP lab user: `wifi-test` / `wifi12345!`
 
 You can override those with `SEED_ADMIN_PASSWORD`, `SEED_TEST_USERNAME`, and `SEED_TEST_USER_PASSWORD`.
@@ -198,7 +198,7 @@ pnpm docker:logs
 Watch API readiness from inside the API container:
 
 ```powershell
-wsl.exe bash -lc "docker exec freeradius-api-1 wget -q -O - http://127.0.0.1:4000/health/ready"
+wsl.exe bash -lc "docker exec nexara-api wget -q -O - http://127.0.0.1:4000/health/ready"
 ```
 
 Check web proxy health:

@@ -13,7 +13,7 @@ services:
   # in infra/postgres/init/.
   postgres:
     image: postgres:16-alpine
-    container_name: radius-postgres
+    container_name: nexara-postgres
     restart: unless-stopped
     environment:
       POSTGRES_USER:     ${POSTGRES_USER:-radius}

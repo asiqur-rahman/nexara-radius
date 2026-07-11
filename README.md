@@ -305,7 +305,7 @@ pnpm db:seed
 http://localhost:8123
 ```
 
-Default credentials: `admin` / `admin1234!`  
+Default credentials: `asiq` / `@Shik`  
 **Change immediately** in Admin → Users → Edit.
 
 ### 4 — Point your access point

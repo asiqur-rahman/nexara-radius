@@ -1394,7 +1394,7 @@ function FreeRadiusPanel({ token }: { token: string }) {
                 ["Graceful reload (recommended)", "systemctl reload freeradius"],
                 ["Full restart (drops sessions)", "systemctl restart freeradius"],
                 ["Docker Compose",                "docker compose exec freeradius kill -HUP 1"],
-                ["Docker direct",                 "docker exec freeradius kill -HUP 1"],
+                ["Docker direct",                 "docker exec nexara-radius kill -HUP 1"],
                 ["PID file SIGHUP",               "kill -HUP $(cat /var/run/freeradius/freeradius.pid)"],
                 ["radmin socket",                 "radmin -e 'hup server'"],
               ] as [string, string][]
