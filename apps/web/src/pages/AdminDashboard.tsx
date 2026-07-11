@@ -14,12 +14,12 @@ import {
   ShieldCheck,
   ShieldOff,
   Smartphone,
-  Sparkles,
   UsersRound,
   X,
 } from "lucide-react";
 import { listAdminDevices } from "../api/endpoints";
 import { useAuth } from "../auth/AuthContext";
+import { BrandLogo } from "../components/BrandLogo";
 import { ThemeToggle } from "../components/ThemeToggle";
 import { playNotificationSound } from "../hooks/useNotificationSound";
 import { useSSE } from "../hooks/useSSE";
@@ -257,9 +257,7 @@ export default function AdminDashboard() {
           <div className={`${panelClass} flex h-full flex-col rounded-[32px] px-5 py-5`}>
             <div className="theme-divider flex items-start justify-between border-b pb-5">
               <div className="flex items-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-400 via-cyan-400 to-teal-500 shadow-lg shadow-sky-500/20">
-                  <Sparkles className="h-5 w-5 text-slate-950" strokeWidth={2.4} />
-                </div>
+                <BrandLogo className="h-12 w-12" />
                 <div>
                   <div className={`text-[11px] uppercase tracking-[0.32em] ${faintClass}`}>
                     Nexara

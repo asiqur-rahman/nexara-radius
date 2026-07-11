@@ -1,5 +1,6 @@
 ﻿import { useMemo } from "react";
 import { Download, Plus, Share2, Smartphone, Sparkles, X, Zap } from "lucide-react";
+import { BrandLogo } from "./BrandLogo";
 import { usePwaInstall } from "../pwa/PwaInstallContext";
 import { useTheme } from "../theme/ThemeContext";
 
@@ -87,9 +88,7 @@ export function PwaInstallPrompt() {
             <div className="mx-auto mb-3 h-1.5 w-14 rounded-full bg-white/12 md:hidden" />
 
             <div className="flex items-start gap-3">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[20px] bg-gradient-to-br from-sky-400 via-cyan-400 to-teal-400 text-slate-950 shadow-lg shadow-sky-500/20">
-                {mode === "ios" ? <Share2 className="h-5 w-5" /> : <Download className="h-5 w-5" />}
-              </div>
+              <BrandLogo className="h-12 w-12 shrink-0" roundedClassName="rounded-[20px]" />
 
               <div className="min-w-0 flex-1">
                 <div className={`text-[11px] uppercase tracking-[0.28em] ${isWhiteTheme ? "text-sky-600" : "text-sky-300"}`}>

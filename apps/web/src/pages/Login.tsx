@@ -1,7 +1,8 @@
 ﻿import { type FormEvent, useState } from "react";
-import { KeyRound, Loader2, Lock, ShieldCheck, User } from "lucide-react";
+import { KeyRound, Loader2, Lock, User } from "lucide-react";
 import { ApiCallError } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
+import { BrandLogo } from "../components/BrandLogo";
 import { PwaInstallButton } from "../components/PwaInstallButton";
 import { ThemeToggle } from "../components/ThemeToggle";
 import { useTheme } from "../theme/ThemeContext";
@@ -58,9 +59,7 @@ export function Login() {
             <div>
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-400 via-cyan-400 to-teal-500 text-slate-950 shadow-lg shadow-sky-500/20">
-                    <ShieldCheck className="h-5 w-5" strokeWidth={2.4} />
-                  </div>
+                  <BrandLogo className="h-12 w-12" />
                   <div>
                     <div className="theme-text-faint text-[11px] uppercase tracking-[0.3em]">
                       Nexara
@@ -107,9 +106,7 @@ export function Login() {
           <section className="theme-surface-strong mx-auto w-full max-w-md rounded-[36px] px-6 py-7 sm:px-7 sm:py-8 lg:max-w-none lg:px-8 lg:py-9">
             <div className="mb-7 flex items-center justify-between gap-3 lg:hidden">
               <div className="flex items-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-400 via-cyan-400 to-teal-500 text-slate-950 shadow-lg shadow-sky-500/20">
-                  <ShieldCheck className="h-5 w-5" strokeWidth={2.4} />
-                </div>
+                <BrandLogo className="h-12 w-12" />
                 <div>
                   <div className="theme-text-faint text-[11px] uppercase tracking-[0.3em]">
                     Nexara

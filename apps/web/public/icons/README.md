@@ -2,6 +2,12 @@
 
 `icon.svg` is the source icon used to generate all PNG variants.
 
+Regenerate PNGs after editing the SVG:
+
+```bash
+node ops/generate-pwa-icons.mjs
+```
+
 ## Current files
 
 | File | Size | Purpose |

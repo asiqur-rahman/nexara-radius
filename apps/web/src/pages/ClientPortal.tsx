@@ -13,6 +13,7 @@ import {
   X,
 } from "lucide-react";
 import { useAuth } from "../auth/AuthContext";
+import { BrandLogo } from "../components/BrandLogo";
 import { ThemeToggle } from "../components/ThemeToggle";
 import { useTheme } from "../theme/ThemeContext";
 import { LiveConnectionGuideView } from "../views/LiveConnectionGuideView";
@@ -158,9 +159,7 @@ export default function ClientPortal() {
           <header className={`sticky top-0 z-30 border-b px-4 py-3 backdrop-blur-2xl lg:hidden safe-top ${headerBg}`}>
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0 flex items-center gap-3">
-                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-500 to-teal-500 shadow-lg shadow-sky-500/20">
-                  <Wifi className="h-4.5 w-4.5 text-white" strokeWidth={2.4} />
-                </div>
+                <BrandLogo className="h-11 w-11" />
                 <div className="min-w-0">
                   <div className={`text-[11px] uppercase tracking-[0.3em] ${faintColor}`}>Nexara</div>
                   <div className={`truncate text-[15px] font-semibold tracking-tight ${titleColor}`}>{activeItem.label}</div>
@@ -185,9 +184,7 @@ export default function ClientPortal() {
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-500 to-teal-500 shadow-lg shadow-sky-500/20">
-                    <Wifi className="h-5 w-5 text-white" strokeWidth={2.4} />
-                  </div>
+                  <BrandLogo className="h-12 w-12" />
                   <div>
                     <div className={`text-[11px] uppercase tracking-[0.3em] ${faintColor}`}>Nexara</div>
                     <div className={`mt-1 text-base font-semibold tracking-tight ${titleColor}`}>My Wi-Fi</div>

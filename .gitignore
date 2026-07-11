@@ -46,6 +46,7 @@ infra/freeradius/raddb/certs/*
 _arch.txt
 _arch_unpacked/
 _doc.xml
+ops/icon-tools/
 
 # Windows /dev/null redirect artifact
 nul

@@ -1,21 +1,33 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="96" fill="#09090b"/>
-  <!-- Indigo to violet gradient background tile -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <!-- Full-bleed background for Android maskable safe-zone cropping -->
+  <rect width="512" height="512" fill="#0b1220"/>
   <defs>
-    <linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#6366f1"/>
-      <stop offset="100%" stop-color="#7c3aed"/>
+    <linearGradient id="tile" x1="64" y1="64" x2="448" y2="448" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#38bdf8"/>
+      <stop offset="50%" stop-color="#22d3ee"/>
+      <stop offset="100%" stop-color="#14b8a6"/>
     </linearGradient>
   </defs>
-  <rect x="80" y="80" width="352" height="352" rx="64" fill="url(#g)"/>
-  <!-- Wifi signal arcs -->
-  <circle cx="256" cy="296" r="28" fill="white"/>
-  <path d="M178 218 C200 196 232 184 256 184 C280 184 312 196 334 218"
-        stroke="white" stroke-width="26" stroke-linecap="round" fill="none" opacity="0.85"/>
-  <path d="M136 176 C172 140 212 120 256 120 C300 120 340 140 376 176"
-        stroke="white" stroke-width="26" stroke-linecap="round" fill="none" opacity="0.45"/>
-  <!-- Shield accent bottom-right -->
-  <path d="M370 330 L370 370 Q370 390 350 398 L330 406 L310 398 Q290 390 290 370 L290 330 L330 318 Z"
-        fill="white" opacity="0.20"/>
-  <path d="M320 360 L328 368 L346 346" stroke="white" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" fill="none" opacity="0.6"/>
+
+  <!-- Rounded brand tile -->
+  <rect x="56" y="56" width="400" height="400" rx="96" fill="url(#tile)"/>
+
+  <!-- Wi-Fi signal mark (centered in adaptive safe zone) -->
+  <path
+    d="M152 214 C184 178 218 156 256 156 C294 156 328 178 360 214"
+    stroke="#0f172a"
+    stroke-width="34"
+    stroke-linecap="round"
+    fill="none"
+    opacity="0.38"
+  />
+  <path
+    d="M188 258 C210 234 232 220 256 220 C280 220 302 234 324 258"
+    stroke="#0f172a"
+    stroke-width="34"
+    stroke-linecap="round"
+    fill="none"
+    opacity="0.72"
+  />
+  <circle cx="256" cy="318" r="36" fill="#0f172a"/>
 </svg>
