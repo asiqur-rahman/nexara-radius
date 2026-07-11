@@ -61,11 +61,11 @@ async function main() {
 
   const csv = [
     "username,email,fullName,password,role,status,group,certEnabled,validFrom,validUntil,devices",
-    `${userA},${userA}@example.local,Import A,ImportPass123!,user,active,Guest,true,,,,*${mac1}|Phone A|approved;${mac2}|Laptop A|pending`,
+    `${userA},${userA}@example.local,Import A,ImportPass123!,user,active,Guest,true,,,*${mac1}|Phone A|approved;${mac2}|Laptop A|pending`,
     `${userB},${userB}@example.local,Import B,ImportPass123!,user,active,Family,true,,,${mac3}|Tablet B|approved`,
   ].join("\r\n") + "\r\n";
 
-  writeFileSync("ops/tmp-import-sample.csv", csv);
+  writeFileSync("/tmp/tmp-import-sample.csv", csv);
 
   console.log("3) Dry-run import...");
   const dry = await json("/admin/users/import", {
@@ -101,7 +101,7 @@ async function main() {
   console.log("6) Upsert with device update...");
   const csvUpsert = [
     "username,email,fullName,password,role,status,group,certEnabled,validFrom,validUntil,devices",
-    `${userA},${userA}@example.local,Import A Updated,,user,active,Guest,true,,,,*${mac1}|Phone A Renamed|approved;${mac2}|Laptop A|approved`,
+    `${userA},${userA}@example.local,Import A Updated,,user,active,Guest,true,,,*${mac1}|Phone A Renamed|approved;${mac2}|Laptop A|approved`,
   ].join("\r\n") + "\r\n";
   const upserted = await json("/admin/users/import", {
     method: "POST",

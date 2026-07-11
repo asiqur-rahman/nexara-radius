@@ -36,6 +36,8 @@ import type {
   UserDevice,
   UserImportRequest,
   UserImportResult,
+  SystemBackupRestoreRequest,
+  SystemBackupRestoreResult,
   UserSummary,
   UpdateUserRequest,
 } from "@app/shared";
@@ -83,6 +85,26 @@ export function downloadUsersImportTemplate(token: string) {
 }
 export function importUsers(token: string, body: UserImportRequest) {
   return api<UserImportResult>(`${v1}/admin/users/import`, { method: "POST", token, body });
+}
+
+// ── System backup / restore ──────────────────────────────────────────
+export function downloadSystemBackup(token: string, opts?: { includeHistory?: boolean }) {
+  const params = new URLSearchParams();
+  if (opts?.includeHistory === false) params.set("includeHistory", "false");
+  const qs = params.toString();
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+  return apiDownload(
+    `${v1}/admin/backup${qs ? `?${qs}` : ""}`,
+    `nexara-backup-${stamp}.json.gz`,
+    { token },
+  );
+}
+export function restoreSystemBackup(token: string, body: SystemBackupRestoreRequest) {
+  return api<SystemBackupRestoreResult>(`${v1}/admin/backup/restore`, {
+    method: "POST",
+    token,
+    body,
+  });
 }
 // ── Self-service certs (user portal) ─────────────────────────────────
 export function listMyCerts(token: string) {

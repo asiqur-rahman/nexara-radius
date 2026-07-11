@@ -268,6 +268,7 @@ export function LiveUsersView() {
                             <div className="mt-1 truncate text-sm text-slate-500">
                               @{user.username}
                               {user.email ? ` · ${user.email}` : ""}
+                              {user.phone ? ` · ${user.phone}` : ""}
                             </div>
                           </div>
                           <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-slate-500" />
@@ -359,6 +360,7 @@ export function LiveUsersView() {
                     <div className="mt-1 text-xs text-slate-500">
                       {user.username}
                       {user.email ? ` / ${user.email}` : ""}
+                      {user.phone ? ` / ${user.phone}` : ""}
                     </div>
                   </td>
                   <td className="px-4 py-4 text-slate-300">

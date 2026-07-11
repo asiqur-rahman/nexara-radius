@@ -7,6 +7,8 @@ import {
   ChevronDown,
   ChevronUp,
   Copy,
+  DatabaseBackup,
+  Download,
   Eye,
   EyeOff,
   FileLock2,
@@ -26,7 +28,7 @@ import {
   Upload,
   Users,
 } from "lucide-react";
-import type { CaInfo, CertSeverity, EapCertificate } from "@app/shared";
+import type { CaInfo, CertSeverity, EapCertificate, SystemBackupRestoreResult } from "@app/shared";
 import {
   type LdapSettingsResponse,
   type RadiusAllowedIp,
@@ -51,6 +53,8 @@ import {
   saveSamlSettings,
   testLdapConnection,
   runLdapSync,
+  downloadSystemBackup,
+  restoreSystemBackup,
 } from "../api/endpoints";
 import { ApiCallError } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
@@ -1543,6 +1547,202 @@ function NacPanel({ token }: { token: string }) {
   );
 }
 
+// ── System Backup / Restore panel ──────────────────────────────────────────
+
+function BackupRestorePanel({ token }: { token: string }) {
+  const fileRef = React.useRef<HTMLInputElement>(null);
+  const [includeHistory, setIncludeHistory] = useState(true);
+  const [busy, setBusy] = useState<"download" | "restore" | null>(null);
+  const [confirm, setConfirm] = useState("");
+  const [fileName, setFileName] = useState<string | null>(null);
+  const [archiveBase64, setArchiveBase64] = useState<string | null>(null);
+  const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null);
+  const [lastRestore, setLastRestore] = useState<SystemBackupRestoreResult | null>(null);
+
+  const onPickFile = async (file: File | undefined) => {
+    if (!file) return;
+    if (file.size > 64 * 1024 * 1024) {
+      setNotice({ ok: false, text: "Backup file too large (max 64 MB)." });
+      return;
+    }
+    setNotice(null);
+    setLastRestore(null);
+    setFileName(file.name);
+    const buf = new Uint8Array(await file.arrayBuffer());
+    let binary = "";
+    const chunk = 0x8000;
+    for (let i = 0; i < buf.length; i += chunk) {
+      binary += String.fromCharCode(...buf.subarray(i, i + chunk));
+    }
+    setArchiveBase64(btoa(binary));
+  };
+
+  const download = async () => {
+    setBusy("download");
+    setNotice(null);
+    try {
+      await downloadSystemBackup(token, { includeHistory });
+      setNotice({
+        ok: true,
+        text: includeHistory
+          ? "Full system backup downloaded (includes session/auth history)."
+          : "System backup downloaded (without radacct/radpostauth history).",
+      });
+    } catch (err) {
+      setNotice({
+        ok: false,
+        text: err instanceof ApiCallError ? err.payload.message : err instanceof Error ? err.message : "Download failed",
+      });
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const restore = async () => {
+    if (!archiveBase64) {
+      setNotice({ ok: false, text: "Choose a .json.gz backup file first." });
+      return;
+    }
+    if (confirm !== "RESTORE") {
+      setNotice({ ok: false, text: 'Type RESTORE in the confirmation box to proceed.' });
+      return;
+    }
+    setBusy("restore");
+    setNotice(null);
+    setLastRestore(null);
+    try {
+      const result = await restoreSystemBackup(token, { confirm: "RESTORE", archiveBase64 });
+      setLastRestore(result);
+      setNotice({
+        ok: true,
+        text: result.reloaded
+          ? "Restore complete. FreeRADIUS was reloaded."
+          : `Restore complete.${result.reloadError ? ` Reload warning: ${result.reloadError}` : " Reload FreeRADIUS if NAS clients changed."}`,
+      });
+      setConfirm("");
+    } catch (err) {
+      setNotice({
+        ok: false,
+        text: err instanceof ApiCallError ? err.payload.message : err instanceof Error ? err.message : "Restore failed",
+      });
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-5">
+      <div className="mb-1 flex items-center gap-3">
+        <DatabaseBackup className="h-5 w-5 text-sky-400" />
+        <div>
+          <h3 className="font-semibold text-white">System Backup &amp; Restore</h3>
+          <p className="text-xs text-zinc-500 mt-0.5">
+            Download a full platform snapshot (users, secrets, devices, groups, NAS, certificates,
+            settings, RADIUS tables) or restore from a previous backup. Restore is destructive.
+          </p>
+        </div>
+      </div>
+
+      {notice && (
+        <div className={`mt-3 rounded-lg border px-3 py-2 text-sm ${
+          notice.ok ? "border-emerald-900 bg-emerald-950/20 text-emerald-300"
+                    : "border-rose-900 bg-rose-950/20 text-rose-300"
+        }`}>
+          {notice.ok ? <CheckCircle2 className="inline h-3.5 w-3.5 mr-1.5" /> : <AlertTriangle className="inline h-3.5 w-3.5 mr-1.5" />}
+          {notice.text}
+        </div>
+      )}
+
+      <div className="mt-4 grid gap-4 lg:grid-cols-2">
+        <section className="rounded-lg border border-zinc-800 bg-zinc-950/40 p-4 space-y-3">
+          <div className="text-sm font-semibold text-white">Download backup</div>
+          <label className="flex items-center gap-2 text-sm text-zinc-300 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={includeHistory}
+              onChange={(e) => setIncludeHistory(e.target.checked)}
+              className="rounded border-zinc-600"
+            />
+            Include RADIUS accounting / post-auth history
+          </label>
+          <p className="text-xs text-zinc-500">
+            File format: <code className="font-mono text-zinc-400">nexara-backup-*.json.gz</code>.
+            Keep it secret — it contains password hashes, NAS secrets, and CA keys.
+            Also back up <code className="font-mono text-zinc-400">.env</code> and EAP server cert files separately.
+          </p>
+          <button
+            type="button"
+            disabled={busy !== null}
+            onClick={() => void download()}
+            className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-500 disabled:opacity-60"
+          >
+            {busy === "download" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+            Download backup
+          </button>
+        </section>
+
+        <section className="rounded-lg border border-rose-900/40 bg-rose-950/10 p-4 space-y-3">
+          <div className="text-sm font-semibold text-rose-200">Restore backup</div>
+          <p className="text-xs text-zinc-500">
+            Replaces <strong className="text-zinc-300">all</strong> platform data with the backup.
+            Type <code className="font-mono text-rose-300">RESTORE</code> to confirm.
+          </p>
+          <input
+            ref={fileRef}
+            type="file"
+            accept=".gz,.json,application/gzip,application/json"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              e.target.value = "";
+              void onPickFile(f);
+            }}
+          />
+          <button
+            type="button"
+            disabled={busy !== null}
+            onClick={() => fileRef.current?.click()}
+            className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-rose-500/40 bg-rose-500/5 px-3 py-6 text-sm text-rose-100 hover:bg-rose-500/10"
+          >
+            <Upload className="h-4 w-4" />
+            {fileName ?? "Select backup file (.json.gz)"}
+          </button>
+          <input
+            value={confirm}
+            onChange={(e) => setConfirm(e.target.value)}
+            placeholder='Type RESTORE to confirm'
+            className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 font-mono text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-rose-500 focus:outline-none"
+          />
+          <button
+            type="button"
+            disabled={busy !== null || !archiveBase64 || confirm !== "RESTORE"}
+            onClick={() => void restore()}
+            className="inline-flex items-center gap-2 rounded-lg bg-rose-600 px-4 py-2 text-sm font-medium text-white hover:bg-rose-500 disabled:opacity-50"
+          >
+            {busy === "restore" ? <Loader2 className="h-4 w-4 animate-spin" /> : <DatabaseBackup className="h-4 w-4" />}
+            Restore now
+          </button>
+        </section>
+      </div>
+
+      {lastRestore && (
+        <div className="mt-4 rounded-lg border border-zinc-800 bg-zinc-950/40 p-3">
+          <div className="text-[10px] uppercase tracking-wider text-zinc-500 mb-2">Restored counts</div>
+          <div className="flex flex-wrap gap-2 text-xs text-zinc-300">
+            {Object.entries(lastRestore.restored)
+              .filter(([, n]) => n > 0)
+              .map(([k, n]) => (
+                <span key={k} className="rounded-md border border-zinc-700 px-2 py-1 font-mono">
+                  {k}:{n}
+                </span>
+              ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Main Settings view ─────────────────────────────────────────────────────
 
 export function LiveSettingsView() {
@@ -1555,7 +1755,7 @@ export function LiveSettingsView() {
       <div>
         <div className="flex items-center gap-2">
           <h2 className="theme-text-primary text-xl font-semibold">Settings</h2>
-          <PageHelp title="Platform Settings" description="Platform-wide configuration controls. Changes here affect authentication security policy, RADIUS hook authentication, CoA behavior when policies change, and notification integrations." tips={["RADIUS Hook Secret must match the X-Radius-Hook-Secret header configured in FreeRADIUS rlm_rest — mismatches will break all RADIUS policy callbacks", "IP Guard restricts /radius/* endpoints to a registered allowlist of FreeRADIUS server IPs — enable in production", "Telegram bot token and admin chat ID enable real-time device approval request notifications"]} />
+          <PageHelp title="Platform Settings" description="Platform-wide configuration controls. Changes here affect authentication security policy, RADIUS hook authentication, CoA behavior when policies change, and notification integrations." tips={["RADIUS Hook Secret must match the X-Radius-Hook-Secret header configured in FreeRADIUS rlm_rest — mismatches will break all RADIUS policy callbacks", "IP Guard restricts /radius/* endpoints to a registered allowlist of FreeRADIUS server IPs — enable in production", "Use System Backup & Restore to snapshot or recover the full platform database", "Telegram bot token and admin chat ID enable real-time device approval request notifications"]} />
         </div>
         <p className="theme-text-muted mt-0.5 text-sm">
           Certificate inventory, security posture, and RADIUS hook controls.
@@ -1566,6 +1766,7 @@ export function LiveSettingsView() {
       <CaPanel token={token} />
       <CertSettingsPanel token={token} />
       <FreeRadiusPanel token={token} />
+      <BackupRestorePanel token={token} />
       <TelegramPanel token={token} />
       <LdapPanel token={token} />
       <SamlPanel token={token} />

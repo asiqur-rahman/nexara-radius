@@ -26,6 +26,7 @@ function toSummary(u: Awaited<ReturnType<typeof loadUserWithGroups>>): UserSumma
     id: u.id,
     username: u.username,
     email: u.email,
+    phone: u.phone,
     fullName: u.fullName,
     role: u.role,
     status: u.status,

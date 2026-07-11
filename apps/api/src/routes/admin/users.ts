@@ -38,9 +38,32 @@ const usernameSchema = z
 
 const passwordSchema = z.string().min(10).max(256);
 
+const optionalEmail = z
+  .union([z.string().email().max(254), z.literal(""), z.null()])
+  .optional()
+  .transform((v) => {
+    if (v === undefined) return undefined;
+    if (v === null || v === "") return null;
+    return v.toLowerCase();
+  });
+
+const optionalPhone = z
+  .union([
+    z.string().max(32).regex(/^[0-9+\-\s().]*$/, "phone may only contain digits and + - ( ) . spaces"),
+    z.literal(""),
+    z.null(),
+  ])
+  .optional()
+  .transform((v) => {
+    if (v === undefined) return undefined;
+    if (v === null || v === "") return null;
+    return v.trim();
+  });
+
 const CreateUserBody = z.object({
   username:    usernameSchema,
-  email:       z.string().email().max(254),
+  email:       optionalEmail,
+  phone:       optionalPhone,
   fullName:    z.string().max(120).optional(),
   password:    passwordSchema,
   role:        z.enum(["admin", "user"]).optional(),
@@ -53,7 +76,8 @@ const CreateUserBody = z.object({
 
 const UpdateUserBody = z.object({
   username:    usernameSchema.optional(),
-  email:       z.string().email().max(254).optional(),
+  email:       optionalEmail,
+  phone:       optionalPhone,
   fullName:    z.string().max(120).nullable().optional(),
   role:        z.enum(["admin", "user"]).optional(),
   status:      z.enum(["pending", "active", "suspended", "expired"]).optional(),
@@ -97,6 +121,7 @@ function toSummary(u: UserWithGroups): UserSummary {
     id: u.id,
     username: u.username,
     email: u.email,
+    phone: u.phone,
     fullName: u.fullName,
     role: u.role,
     status: u.status,
@@ -208,6 +233,7 @@ const adminUsers: FastifyPluginAsync = async (app) => {
       where.OR = [
         { username: { contains: q.q, mode: "insensitive" } },
         { email: { contains: q.q, mode: "insensitive" } },
+        { phone: { contains: q.q, mode: "insensitive" } },
         { fullName: { contains: q.q, mode: "insensitive" } },
       ];
     }
@@ -242,6 +268,7 @@ const adminUsers: FastifyPluginAsync = async (app) => {
       where.OR = [
         { username: { contains: q.q, mode: "insensitive" } },
         { email: { contains: q.q, mode: "insensitive" } },
+        { phone: { contains: q.q, mode: "insensitive" } },
         { fullName: { contains: q.q, mode: "insensitive" } },
       ];
     }
@@ -262,7 +289,8 @@ const adminUsers: FastifyPluginAsync = async (app) => {
     const csv = toCsv(
       users.map((u) => ({
         username: u.username,
-        email: u.email,
+        email: u.email ?? "",
+        phone: u.phone ?? "",
         fullName: u.fullName ?? "",
         password: "",
         role: u.role,
@@ -321,7 +349,10 @@ const adminUsers: FastifyPluginAsync = async (app) => {
 
     for (const row of rows) {
       const username = row.username.toLowerCase();
-      const email = row.email.toLowerCase();
+      const emailRaw = row.email.trim().toLowerCase();
+      const email = emailRaw || null;
+      const phoneRaw = row.phone.trim();
+      const phone = phoneRaw || null;
       const label = username || email || `line ${row.line}`;
 
       const fail = (message: string) => {
@@ -329,24 +360,32 @@ const adminUsers: FastifyPluginAsync = async (app) => {
         result.rows.push({ line: row.line, username: label, action: "failed", message });
       };
 
-      if (!username || !email) {
-        fail("username and email are required");
+      if (!username) {
+        fail("username is required");
         continue;
       }
       if (!/^[a-z0-9._-]+$/i.test(username) || username.length < 2 || username.length > 64) {
         fail("invalid username");
         continue;
       }
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) {
+      if (email && (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254)) {
         fail("invalid email");
         continue;
       }
-      if (seenUsernames.has(username) || seenEmails.has(email)) {
-        fail("duplicate username or email within this CSV");
+      if (phone && (phone.length > 32 || !/^[0-9+\-\s().]+$/.test(phone))) {
+        fail("invalid phone");
+        continue;
+      }
+      if (seenUsernames.has(username)) {
+        fail("duplicate username within this CSV");
+        continue;
+      }
+      if (email && seenEmails.has(email)) {
+        fail("duplicate email within this CSV");
         continue;
       }
       seenUsernames.add(username);
-      seenEmails.add(email);
+      if (email) seenEmails.add(email);
 
       const roleRaw = (row.role || "user").toLowerCase();
       if (roleRaw !== "admin" && roleRaw !== "user") {
@@ -406,7 +445,9 @@ const adminUsers: FastifyPluginAsync = async (app) => {
       }
 
       const existing = await prisma.user.findFirst({
-        where: { OR: [{ username }, { email }] },
+        where: email
+          ? { OR: [{ username }, { email }] }
+          : { username },
       });
 
       if (!existing) {
@@ -438,6 +479,7 @@ const adminUsers: FastifyPluginAsync = async (app) => {
               data: {
                 username,
                 email,
+                phone,
                 fullName,
                 role,
                 status: createdStatus,
@@ -500,11 +542,11 @@ const adminUsers: FastifyPluginAsync = async (app) => {
         continue;
       }
 
-      if (existing.username !== username && existing.email === email) {
+      if (existing.username !== username && email && existing.email === email) {
         fail(`email belongs to different user "${existing.username}"`);
         continue;
       }
-      if (existing.email !== email) {
+      if (email && existing.email !== email) {
         const emailTaken = await prisma.user.findFirst({
           where: { email, NOT: { id: existing.id } },
         });
@@ -575,6 +617,7 @@ const adminUsers: FastifyPluginAsync = async (app) => {
             where: { id: existing.id },
             data: {
               email,
+              phone,
               fullName,
               role,
               status,
@@ -670,7 +713,8 @@ const adminUsers: FastifyPluginAsync = async (app) => {
       const user = await tx.user.create({
         data: {
           username: body.username.toLowerCase(),
-          email: body.email.toLowerCase(),
+          email: body.email ?? null,
+          phone: body.phone ?? null,
           fullName: body.fullName,
           role:        body.role ?? "user",
           status:      body.status ?? "active",
@@ -734,7 +778,8 @@ const adminUsers: FastifyPluginAsync = async (app) => {
       // ──────────────────────────────────────────────────────────────
 
       const data: Prisma.UserUpdateInput = {
-        email:       body.email?.toLowerCase(),
+        email:       body.email === undefined ? undefined : body.email,
+        phone:       body.phone === undefined ? undefined : body.phone,
         fullName:    body.fullName,
         role:        body.role,
         status:      body.status,

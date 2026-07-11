@@ -15,7 +15,8 @@ export type DeviceType   = "laptop" | "mobile" | "tablet" | "iot" | "printer" | 
 export interface UserSummary {
   id: string;
   username: string;
-  email: string;
+  email: string | null;
+  phone: string | null;
   fullName: string | null;
   role: UserRole;
   status: UserStatus;
@@ -58,7 +59,8 @@ export interface Paginated<T> {
 
 export interface CreateUserRequest {
   username: string;
-  email: string;
+  email?: string | null;
+  phone?: string | null;
   fullName?: string;
   password: string;
   role?: UserRole;
@@ -71,7 +73,8 @@ export interface CreateUserRequest {
 
 export interface UpdateUserRequest {
   username?: string;
-  email?: string;
+  email?: string | null;
+  phone?: string | null;
   fullName?: string | null;
   status?: UserStatus;
   role?: UserRole;
@@ -106,6 +109,18 @@ export interface UserImportRequest {
   csv: string;
   mode?: "create" | "upsert";
   dryRun?: boolean;
+}
+
+export interface SystemBackupRestoreResult {
+  ok: true;
+  restored: Record<string, number>;
+  reloaded: boolean;
+  reloadError?: string;
+}
+
+export interface SystemBackupRestoreRequest {
+  confirm: "RESTORE";
+  archiveBase64: string;
 }
 
 // ── Groups & policy ──────────────────────────────────────────────────
@@ -237,7 +252,7 @@ export interface AdminDeviceSummary extends UserDevice {
   userId:       string;
   username:     string;
   fullName:     string | null;
-  email:        string;
+  email:        string | null;
   decidedAt:    string | null;
   decidedBy:    string | null;
   decisionNote: string | null;

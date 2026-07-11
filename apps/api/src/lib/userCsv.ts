@@ -12,6 +12,7 @@
 export const USER_CSV_HEADERS = [
   "username",
   "email",
+  "phone",
   "fullName",
   "password",
   "role",
@@ -37,6 +38,7 @@ export interface ParsedDeviceEntry {
 export interface UserCsvRow {
   username: string;
   email: string;
+  phone: string;
   fullName: string;
   password: string;
   role: string;
@@ -169,10 +171,10 @@ export function parseUserCsv(text: string): { rows: UserCsvRow[]; errors: string
     if (idx >= 0) indexOf[h] = idx;
   }
 
-  if (indexOf.username === undefined || indexOf.email === undefined) {
+  if (indexOf.username === undefined) {
     return {
       rows: [],
-      errors: ["CSV header must include at least username and email columns"],
+      errors: ["CSV header must include a username column"],
     };
   }
 
@@ -189,6 +191,7 @@ export function parseUserCsv(text: string): { rows: UserCsvRow[]; errors: string
     rows.push({
       username: get("username"),
       email: get("email"),
+      phone: get("phone"),
       fullName: get("fullName"),
       password: get("password"),
       role: get("role"),
@@ -225,6 +228,7 @@ export const USER_CSV_TEMPLATE = toCsv([
   {
     username: "jdoe",
     email: "jdoe@example.com",
+    phone: "+8801700000000",
     fullName: "Jane Doe",
     password: "ChangeMe123!",
     role: "user",

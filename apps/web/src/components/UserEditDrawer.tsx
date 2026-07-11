@@ -129,7 +129,8 @@ export function UserEditDrawer({ user, groups, token, onClose, onSaved }: Props)
   const isSelf = currentUser?.id === user.id;
 
   const [username, setUsername] = useState(user.username);
-  const [email, setEmail] = useState(user.email);
+  const [email, setEmail] = useState(user.email ?? "");
+  const [phone, setPhone] = useState(user.phone ?? "");
   const [fullName, setFullName] = useState(user.fullName ?? "");
   const [role, setRole] = useState<UserRole>(user.role);
   const [status, setStatus] = useState<UserStatus>(user.status);
@@ -231,8 +232,8 @@ export function UserEditDrawer({ user, groups, token, onClose, onSaved }: Props)
   };
 
   const handleSave = async () => {
-    if (!username.trim() || !email.trim()) {
-      setError("Username and email are required.");
+    if (!username.trim()) {
+      setError("Username is required.");
       return;
     }
 
@@ -241,7 +242,8 @@ export function UserEditDrawer({ user, groups, token, onClose, onSaved }: Props)
 
     try {
       const body: Parameters<typeof updateUser>[2] = {
-        email: email.toLowerCase().trim(),
+        email: email.trim() ? email.toLowerCase().trim() : null,
+        phone: phone.trim() ? phone.trim() : null,
         fullName: fullName.trim() || null,
         role,
         status,
@@ -337,26 +339,38 @@ export function UserEditDrawer({ user, groups, token, onClose, onSaved }: Props)
               </Field>
 
               <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Email" light={isWhiteTheme}>
+                <Field label="Email" hint="Optional" light={isWhiteTheme}>
                   <Input
                     light={isWhiteTheme}
                     type="email"
                     value={email}
                     onChange={(event) => setEmail(event.target.value)}
                     maxLength={254}
+                    placeholder="Optional"
                   />
                 </Field>
 
-                <Field label="Name" light={isWhiteTheme}>
+                <Field label="Phone" hint="Optional" light={isWhiteTheme}>
                   <Input
                     light={isWhiteTheme}
-                    value={fullName}
-                    onChange={(event) => setFullName(event.target.value)}
-                    placeholder="Optional"
-                    maxLength={120}
+                    type="tel"
+                    value={phone}
+                    onChange={(event) => setPhone(event.target.value)}
+                    maxLength={32}
+                    placeholder="+8801XXXXXXXXX"
                   />
                 </Field>
               </div>
+
+              <Field label="Name" light={isWhiteTheme}>
+                <Input
+                  light={isWhiteTheme}
+                  value={fullName}
+                  onChange={(event) => setFullName(event.target.value)}
+                  placeholder="Optional"
+                  maxLength={120}
+                />
+              </Field>
             </Section>
 
             <Section eyebrow="Access" title="Role and state" light={isWhiteTheme}>

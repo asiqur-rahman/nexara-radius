@@ -40,7 +40,7 @@ interface DecisionDevice {
     id:       string;
     username: string;
     fullName: string | null;
-    email:    string;
+    email:    string | null;
   };
 }
 

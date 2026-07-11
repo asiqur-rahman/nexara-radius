@@ -142,7 +142,7 @@ export function UserImportDrawer({ token, onClose, onDone }: Props) {
               <div className="text-sm font-semibold">1. Get a template or export</div>
             </div>
             <p className={`mb-3 text-sm ${muted}`}>
-              Columns: username, email, fullName, password, role, status, group, certEnabled,
+              Columns: username, email (optional), phone (optional), fullName, password, role, status, group, certEnabled,
               validFrom, validUntil, devices. Group must match an existing name (e.g. Guest).
               Devices use <code className="font-mono text-[11px]">mac|label|status</code> entries
               separated by <code className="font-mono text-[11px]">;</code>

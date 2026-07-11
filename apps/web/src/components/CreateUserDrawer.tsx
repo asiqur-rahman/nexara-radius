@@ -11,9 +11,9 @@ import type { GroupSummary, UserRole, UserSummary } from "@app/shared";
 import { createUser } from "../api/endpoints";
 import { useTheme } from "../theme/ThemeContext";
 
-function randomPassword(): string {
-  const chars = "abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789!@#$%";
-  return Array.from({ length: 16 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
+function passwordFromUsername(username: string): string {
+  const base = username.trim().toLowerCase();
+  return base ? `${base}12345!` : "";
 }
 
 function Section({
@@ -102,9 +102,11 @@ export function CreateUserDrawer({ groups, token, onClose, onCreated }: Props) {
   const { isWhiteTheme } = useTheme();
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [fullName, setFullName] = useState("");
-  const [password, setPassword] = useState(randomPassword());
-  const [showPwd, setShowPwd] = useState(false);
+  const [password, setPassword] = useState("");
+  const [passwordTouched, setPasswordTouched] = useState(false);
+  const [showPwd, setShowPwd] = useState(true);
   const [role, setRole] = useState<UserRole>("user");
   const [status, setStatus] = useState<"active" | "pending">("active");
   const [groupId,     setGroupId]     = useState<string>("");
@@ -134,11 +136,17 @@ export function CreateUserDrawer({ groups, token, onClose, onCreated }: Props) {
     };
   }, []);
 
+  useEffect(() => {
+    if (!passwordTouched) {
+      setPassword(passwordFromUsername(username));
+    }
+  }, [username, passwordTouched]);
+
   const selectGroup = (id: string) => setGroupId(id);
 
   const handleCreate = async () => {
-    if (!username.trim() || !email.trim() || !password.trim()) {
-      setError("Username, email, and password are required.");
+    if (!username.trim() || !password.trim()) {
+      setError("Username and password are required.");
       return;
     }
 
@@ -153,7 +161,8 @@ export function CreateUserDrawer({ groups, token, onClose, onCreated }: Props) {
     try {
       const created = await createUser(token, {
         username: username.trim().toLowerCase(),
-        email: email.trim().toLowerCase(),
+        email: email.trim() ? email.trim().toLowerCase() : null,
+        phone: phone.trim() ? phone.trim() : null,
         fullName: fullName.trim() || undefined,
         password,
         role,
@@ -226,7 +235,7 @@ export function CreateUserDrawer({ groups, token, onClose, onCreated }: Props) {
               </Field>
 
               <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Email" light={isWhiteTheme}>
+                <Field label="Email" hint="Optional" light={isWhiteTheme}>
                   <Input
                     light={isWhiteTheme}
                     type="email"
@@ -237,16 +246,27 @@ export function CreateUserDrawer({ groups, token, onClose, onCreated }: Props) {
                   />
                 </Field>
 
-                <Field label="Name" hint="Optional" light={isWhiteTheme}>
+                <Field label="Phone" hint="Optional" light={isWhiteTheme}>
                   <Input
                     light={isWhiteTheme}
-                    value={fullName}
-                    onChange={(event) => setFullName(event.target.value)}
-                    placeholder="Jane Smith"
-                    maxLength={120}
+                    type="tel"
+                    value={phone}
+                    onChange={(event) => setPhone(event.target.value)}
+                    placeholder="+8801XXXXXXXXX"
+                    maxLength={32}
                   />
                 </Field>
               </div>
+
+              <Field label="Name" hint="Optional" light={isWhiteTheme}>
+                <Input
+                  light={isWhiteTheme}
+                  value={fullName}
+                  onChange={(event) => setFullName(event.target.value)}
+                  placeholder="Jane Smith"
+                  maxLength={120}
+                />
+              </Field>
             </Section>
 
             <Section eyebrow="Access" title="Role and dates" light={isWhiteTheme}>
@@ -380,14 +400,22 @@ export function CreateUserDrawer({ groups, token, onClose, onCreated }: Props) {
               )}
             </Section>
 
-            <Section eyebrow="Password" title="Set a password" description="Used for portal and PEAP sign-in." light={isWhiteTheme}>
-              <Field label="Password" light={isWhiteTheme}>
+            <Section
+              eyebrow="Password"
+              title="Set a password"
+              description="Auto-generated as username + 12345! — used for portal and PEAP sign-in."
+              light={isWhiteTheme}
+            >
+              <Field label="Password" hint="auto: {username}12345!" light={isWhiteTheme}>
                 <div className="relative">
                   <Input
                     light={isWhiteTheme}
                     type={showPwd ? "text" : "password"}
                     value={password}
-                    onChange={(event) => setPassword(event.target.value)}
+                    onChange={(event) => {
+                      setPasswordTouched(true);
+                      setPassword(event.target.value);
+                    }}
                     minLength={10}
                     maxLength={256}
                     className="pr-24"
@@ -395,9 +423,12 @@ export function CreateUserDrawer({ groups, token, onClose, onCreated }: Props) {
                   <div className="absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-1">
                     <button
                       type="button"
-                      onClick={() => setPassword(randomPassword())}
+                      onClick={() => {
+                        setPasswordTouched(false);
+                        setPassword(passwordFromUsername(username));
+                      }}
                       className={`flex h-9 w-9 items-center justify-center rounded-xl transition ${isWhiteTheme ? "text-slate-500 hover:bg-slate-100 hover:text-sky-600" : "text-slate-500 hover:bg-white/[0.05] hover:text-sky-200"}`}
-                      title="Generate password"
+                      title="Reset to username12345!"
                     >
                       <RefreshCw className="h-4 w-4" />
                     </button>
@@ -413,7 +444,7 @@ export function CreateUserDrawer({ groups, token, onClose, onCreated }: Props) {
               </Field>
 
               <div className={`rounded-[22px] border px-4 py-3 text-sm ${isWhiteTheme ? "border-slate-200 bg-white/80 text-slate-600" : "border-white/6 bg-white/[0.03] text-slate-500"}`}>
-                Share it once. The user can change it later.
+                Default pattern is <span className="font-mono text-sky-300">{username.trim() ? `${username.trim().toLowerCase()}12345!` : "username12345!"}</span>. Share it once — the user can change it later.
               </div>
             </Section>
           </div>
@@ -433,7 +464,7 @@ export function CreateUserDrawer({ groups, token, onClose, onCreated }: Props) {
                 </button>
                 <button
                   onClick={() => void handleCreate()}
-                  disabled={busy || !username.trim() || !email.trim() || !password.trim()}
+                  disabled={busy || !username.trim() || !password.trim()}
                   className="inline-flex items-center gap-2 rounded-[18px] bg-gradient-to-r from-sky-400 via-cyan-400 to-teal-400 px-5 py-3 text-sm font-semibold text-slate-950 shadow-lg shadow-sky-500/20 transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {busy ? <RefreshCw className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}

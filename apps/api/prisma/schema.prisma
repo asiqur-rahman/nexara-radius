@@ -96,7 +96,8 @@ enum DeviceType {
 model User {
   id          String     @id @default(cuid())
   username    String     @unique @db.VarChar(64)
-  email       String     @unique @db.VarChar(254)
+  email       String?    @unique @db.VarChar(254)
+  phone       String?    @db.VarChar(32)
   fullName    String?    @db.VarChar(120)
   role        UserRole   @default(user)
   status      UserStatus @default(active)
