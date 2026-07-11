@@ -19,7 +19,9 @@ ENV NODE_ENV=production
 # MD4 (required by PEAP-MSCHAPv2 NT-hash) is disabled by default in OpenSSL 3.
 # The legacy provider re-enables it without affecting security of other operations.
 ENV NODE_OPTIONS=--openssl-legacy-provider
-RUN apk add --no-cache openssl
+# docker-cli: lets the API send SIGHUP to nexara-radius after NAS changes
+# (requires /var/run/docker.sock mounted — see docker-compose.app.yml).
+RUN apk add --no-cache openssl docker-cli
 WORKDIR /app
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/packages/shared ./packages/shared

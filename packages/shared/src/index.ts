@@ -82,6 +82,32 @@ export interface UpdateUserRequest {
   newPassword?: string;
 }
 
+export interface UserImportRowResult {
+  line: number;
+  username: string;
+  action: "created" | "updated" | "skipped" | "failed";
+  message: string;
+}
+
+export interface UserImportResult {
+  dryRun: boolean;
+  mode: "create" | "upsert";
+  total: number;
+  created: number;
+  updated: number;
+  skipped: number;
+  failed: number;
+  devicesCreated: number;
+  devicesUpdated: number;
+  rows: UserImportRowResult[];
+}
+
+export interface UserImportRequest {
+  csv: string;
+  mode?: "create" | "upsert";
+  dryRun?: boolean;
+}
+
 // ── Groups & policy ──────────────────────────────────────────────────
 
 export interface GroupAttribute {

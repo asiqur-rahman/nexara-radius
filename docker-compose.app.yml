@@ -25,6 +25,9 @@ services:
       # The legacy provider re-enables it without weakening other crypto.
       NODE_OPTIONS: --openssl-legacy-provider
       RADIUS_CA_CERT_PATH: /etc/raddb/certs-src/ca.pem
+      # After NAS add/edit/delete the API runs this so FreeRADIUS reloads clients.
+      # Override in .env or Admin → Settings → FreeRADIUS Auto-Reload.
+      FREERADIUS_RELOAD_COMMAND: ${FREERADIUS_RELOAD_COMMAND:-docker kill -s HUP nexara-radius}
     depends_on:
       postgres:
         condition: service_healthy
@@ -33,6 +36,8 @@ services:
       # Docker will create a directory and break first-boot seed.
       # - ./apps/api/prisma/seed.config.json:/app/apps/api/prisma/seed.config.json:ro
       - ./infra/freeradius/raddb/certs:/etc/raddb/certs-src:ro
+      # Needed for FREERADIUS_RELOAD_COMMAND (docker kill -s HUP …).
+      - /var/run/docker.sock:/var/run/docker.sock
     expose:
       - "4000"
     healthcheck:

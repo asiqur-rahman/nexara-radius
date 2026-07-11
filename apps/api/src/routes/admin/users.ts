@@ -15,7 +15,18 @@ import { changeUserPassword, purgeRadiusUsername, syncUserToRadius } from "../..
 import { disconnectForPolicyChange } from "../../services/sessions.js";
 import { config } from "../../config.js";
 import { assertPasswordNotBreached } from "../../lib/passwordPolicy.js";
-import type { Paginated, UserSummary } from "@app/shared";
+import type { Paginated, UserImportResult, UserSummary } from "@app/shared";
+import {
+  formatDevicesForCsv,
+  parseBool,
+  parseDevicesField,
+  parseOptionalIsoDate,
+  parseUserCsv,
+  toCsv,
+  USER_CSV_TEMPLATE,
+  type ParsedDeviceEntry,
+} from "../../lib/userCsv.js";
+import { normalizeMac } from "../../lib/mac.js";
 
 // ── Schemas ────────────────────────────────────────────────────────
 
@@ -66,6 +77,12 @@ const ListQuery = z.object({
   pageSize: z.coerce.number().int().min(1).max(100).default(25),
 });
 
+const ImportBody = z.object({
+  csv: z.string().min(1).max(2_000_000),
+  mode: z.enum(["create", "upsert"]).default("create"),
+  dryRun: z.boolean().default(false),
+});
+
 // ── Mapping ────────────────────────────────────────────────────────
 
 const include = {
@@ -101,6 +118,77 @@ function toSummary(u: UserWithGroups): UserSummary {
     groups:  u.groups.map((g) => ({ id: g.group.id, name: g.group.name })),
     devices: u.devices.map((d) => ({ id: d.id, mac: d.mac, label: d.label, status: d.status })),
   };
+}
+
+async function upsertImportedDevices(
+  tx: Prisma.TransactionClient,
+  userId: string,
+  entries: ParsedDeviceEntry[],
+  actorId: string,
+  req: Parameters<typeof audit>[0]["req"],
+): Promise<{ created: number; updated: number }> {
+  let created = 0;
+  let updated = 0;
+  const normalized: Array<ParsedDeviceEntry & { mac: string }> = [];
+
+  for (const entry of entries) {
+    const mac = normalizeMac(entry.macRaw);
+    if (normalized.some((n) => n.mac === mac)) {
+      throw BadRequest(`duplicate MAC ${mac} in devices column`);
+    }
+    normalized.push({ ...entry, mac });
+  }
+
+  if (normalized.some((d) => d.isPrimary)) {
+    await tx.userDevice.updateMany({ where: { userId }, data: { isPrimary: false } });
+  }
+
+  for (const entry of normalized) {
+    const existing = await tx.userDevice.findUnique({
+      where: { userId_mac: { userId, mac: entry.mac } },
+    });
+    if (existing) {
+      await tx.userDevice.update({
+        where: { id: existing.id },
+        data: {
+          label: entry.label,
+          status: entry.status,
+          isPrimary: entry.isPrimary,
+          verifiedAt: entry.status === "approved" ? (existing.verifiedAt ?? new Date()) : existing.verifiedAt,
+          decidedAt: new Date(),
+          decidedBy: actorId,
+          decisionNote: "csv_import",
+        },
+      });
+      updated++;
+    } else {
+      const createdDevice = await tx.userDevice.create({
+        data: {
+          userId,
+          mac: entry.mac,
+          label: entry.label,
+          status: entry.status,
+          isPrimary: entry.isPrimary,
+          verifiedAt: entry.status === "approved" ? new Date() : null,
+          decidedAt: new Date(),
+          decidedBy: actorId,
+          decisionNote: "csv_import",
+        },
+      });
+      await audit({
+        tx,
+        actorId,
+        action: "user_update",
+        targetType: "device",
+        targetId: createdDevice.id,
+        metadata: { event: "device.import", mac: entry.mac, status: entry.status },
+        req,
+      });
+      created++;
+    }
+  }
+
+  return { created, updated };
 }
 
 // ── Routes ─────────────────────────────────────────────────────────
@@ -142,6 +230,424 @@ const adminUsers: FastifyPluginAsync = async (app) => {
       pageSize: q.pageSize,
     };
     return body;
+  });
+
+  // GET /admin/users/export — CSV download (never includes passwords)
+  app.get("/users/export", async (req, reply) => {
+    const q = ListQuery.omit({ page: true, pageSize: true }).parse(req.query);
+    const where: Prisma.UserWhereInput = {};
+    if (q.status) where.status = q.status;
+    if (q.role) where.role = q.role;
+    if (q.q) {
+      where.OR = [
+        { username: { contains: q.q, mode: "insensitive" } },
+        { email: { contains: q.q, mode: "insensitive" } },
+        { fullName: { contains: q.q, mode: "insensitive" } },
+      ];
+    }
+
+    const users = await prisma.user.findMany({
+      where,
+      include: {
+        groups: { include: { group: true } },
+        devices: {
+          select: { mac: true, label: true, status: true, isPrimary: true },
+          orderBy: [{ isPrimary: "desc" }, { learnedAt: "asc" }],
+        },
+      },
+      orderBy: { username: "asc" },
+      take: 10_000,
+    });
+
+    const csv = toCsv(
+      users.map((u) => ({
+        username: u.username,
+        email: u.email,
+        fullName: u.fullName ?? "",
+        password: "",
+        role: u.role,
+        status: u.status,
+        group: u.groups[0]?.group.name ?? "",
+        certEnabled: u.certEnabled ? "true" : "false",
+        validFrom: u.validFrom?.toISOString() ?? "",
+        validUntil: u.validUntil?.toISOString() ?? "",
+        devices: formatDevicesForCsv(u.devices),
+      })),
+    );
+
+    const stamp = new Date().toISOString().slice(0, 10);
+    return reply
+      .header("Content-Type", "text/csv; charset=utf-8")
+      .header("Content-Disposition", `attachment; filename="nexara-users-${stamp}.csv"`)
+      .send(csv);
+  });
+
+  // GET /admin/users/import/template
+  app.get("/users/import/template", async (_req, reply) => {
+    return reply
+      .header("Content-Type", "text/csv; charset=utf-8")
+      .header("Content-Disposition", 'attachment; filename="nexara-users-template.csv"')
+      .send(USER_CSV_TEMPLATE);
+  });
+
+  // POST /admin/users/import
+  app.post("/users/import", async (req) => {
+    const body = ImportBody.parse(req.body);
+    const actorId = req.currentUser!.sub;
+
+    const { rows, errors: parseErrors } = parseUserCsv(body.csv);
+    if (parseErrors.length) throw BadRequest(parseErrors[0]!);
+    if (rows.length === 0) throw BadRequest("CSV has no data rows");
+    if (rows.length > 1000) throw BadRequest("CSV is limited to 1000 users per import");
+
+    const groups = await prisma.group.findMany({ select: { id: true, name: true } });
+    const groupByName = new Map(groups.map((g) => [g.name.toLowerCase(), g]));
+
+    const result: UserImportResult = {
+      dryRun: body.dryRun,
+      mode: body.mode,
+      total: rows.length,
+      created: 0,
+      updated: 0,
+      skipped: 0,
+      failed: 0,
+      devicesCreated: 0,
+      devicesUpdated: 0,
+      rows: [],
+    };
+
+    const seenUsernames = new Set<string>();
+    const seenEmails = new Set<string>();
+
+    for (const row of rows) {
+      const username = row.username.toLowerCase();
+      const email = row.email.toLowerCase();
+      const label = username || email || `line ${row.line}`;
+
+      const fail = (message: string) => {
+        result.failed++;
+        result.rows.push({ line: row.line, username: label, action: "failed", message });
+      };
+
+      if (!username || !email) {
+        fail("username and email are required");
+        continue;
+      }
+      if (!/^[a-z0-9._-]+$/i.test(username) || username.length < 2 || username.length > 64) {
+        fail("invalid username");
+        continue;
+      }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) {
+        fail("invalid email");
+        continue;
+      }
+      if (seenUsernames.has(username) || seenEmails.has(email)) {
+        fail("duplicate username or email within this CSV");
+        continue;
+      }
+      seenUsernames.add(username);
+      seenEmails.add(email);
+
+      const roleRaw = (row.role || "user").toLowerCase();
+      if (roleRaw !== "admin" && roleRaw !== "user") {
+        fail("role must be admin or user");
+        continue;
+      }
+      const role = roleRaw as "admin" | "user";
+
+      const statusRaw = (row.status || "active").toLowerCase();
+      const allowedStatus = ["pending", "active", "suspended", "expired"] as const;
+      if (!allowedStatus.includes(statusRaw as (typeof allowedStatus)[number])) {
+        fail("status must be pending, active, suspended, or expired");
+        continue;
+      }
+      const status = statusRaw as (typeof allowedStatus)[number];
+
+      let groupIds: string[] = [];
+      if (row.group.trim()) {
+        const g = groupByName.get(row.group.trim().toLowerCase());
+        if (!g) {
+          fail(`unknown group "${row.group.trim()}"`);
+          continue;
+        }
+        groupIds = [g.id];
+      }
+
+      const validFrom = parseOptionalIsoDate(row.validFrom);
+      const validUntil = parseOptionalIsoDate(row.validUntil);
+      if (validFrom === undefined) {
+        fail("invalid validFrom date");
+        continue;
+      }
+      if (validUntil === undefined) {
+        fail("invalid validUntil date");
+        continue;
+      }
+
+      const certEnabled = parseBool(row.certEnabled, true);
+      const fullName = row.fullName.trim() || null;
+
+      let deviceEntries: ParsedDeviceEntry[] = [];
+      if (row.hasDevicesColumn && row.devices.trim()) {
+        const parsedDevices = parseDevicesField(row.devices);
+        if (parsedDevices.error) {
+          fail(parsedDevices.error);
+          continue;
+        }
+        try {
+          for (const entry of parsedDevices.entries) {
+            normalizeMac(entry.macRaw); // validate early
+          }
+        } catch (err) {
+          fail(err instanceof Error ? err.message : "invalid device MAC");
+          continue;
+        }
+        deviceEntries = parsedDevices.entries;
+      }
+
+      const existing = await prisma.user.findFirst({
+        where: { OR: [{ username }, { email }] },
+      });
+
+      if (!existing) {
+        if (!row.password || row.password.length < 10) {
+          fail("password required (min 10 chars) for new users");
+          continue;
+        }
+        if (body.dryRun) {
+          result.created++;
+          result.devicesCreated += deviceEntries.length;
+          result.rows.push({
+            line: row.line,
+            username,
+            action: "created",
+            message: deviceEntries.length
+              ? `would create (+${deviceEntries.length} device${deviceEntries.length === 1 ? "" : "s"})`
+              : "would create",
+          });
+          continue;
+        }
+        try {
+          await assertPasswordNotBreached(row.password);
+          const passwordHashArgon2id = await hashPassword(row.password);
+          const nthash = ntHash(row.password);
+          const createdStatus = status === "pending" || status === "active" ? status : "active";
+
+          const created = await prisma.$transaction(async (tx) => {
+            const user = await tx.user.create({
+              data: {
+                username,
+                email,
+                fullName,
+                role,
+                status: createdStatus,
+                certEnabled,
+                validFrom: validFrom ? new Date(validFrom) : null,
+                validUntil: validUntil ? new Date(validUntil) : null,
+                secret: {
+                  create: { passwordHashArgon2id, ntHash: nthash, mustChangePassword: true },
+                },
+                groups: groupIds.length
+                  ? { create: groupIds.map((gid, i) => ({ groupId: gid, priority: i + 1 })) }
+                  : undefined,
+              },
+              include,
+            });
+            await syncUserToRadius(tx, user.id);
+            const deviceStats = deviceEntries.length
+              ? await upsertImportedDevices(tx, user.id, deviceEntries, actorId, req)
+              : { created: 0, updated: 0 };
+            await audit({
+              tx,
+              actorId,
+              action: "user_create",
+              targetType: "user",
+              targetId: user.id,
+              metadata: {
+                username,
+                source: "csv_import",
+                devices: deviceStats.created,
+              },
+              req,
+            });
+            return { user, deviceStats };
+          });
+          result.created++;
+          result.devicesCreated += created.deviceStats.created;
+          result.devicesUpdated += created.deviceStats.updated;
+          result.rows.push({
+            line: row.line,
+            username: created.user.username,
+            action: "created",
+            message: created.deviceStats.created
+              ? `created (+${created.deviceStats.created} device${created.deviceStats.created === 1 ? "" : "s"})`
+              : "created",
+          });
+        } catch (err) {
+          fail(err instanceof Error ? err.message : "create failed");
+        }
+        continue;
+      }
+
+      if (body.mode === "create") {
+        result.skipped++;
+        result.rows.push({
+          line: row.line,
+          username: existing.username,
+          action: "skipped",
+          message: "already exists",
+        });
+        continue;
+      }
+
+      if (existing.username !== username && existing.email === email) {
+        fail(`email belongs to different user "${existing.username}"`);
+        continue;
+      }
+      if (existing.email !== email) {
+        const emailTaken = await prisma.user.findFirst({
+          where: { email, NOT: { id: existing.id } },
+        });
+        if (emailTaken) {
+          fail("email already taken by another user");
+          continue;
+        }
+      }
+
+      if (row.password && row.password.length > 0 && row.password.length < 10) {
+        fail("password must be at least 10 characters when provided");
+        continue;
+      }
+
+      if (existing.id === actorId && role === "user" && existing.role === "admin") {
+        fail("cannot demote yourself via import");
+        continue;
+      }
+      if (existing.id === actorId && status !== "active") {
+        fail("cannot suspend/expire yourself via import");
+        continue;
+      }
+
+      if (body.dryRun) {
+        result.updated++;
+        // Approximate device create/update counts for dry-run
+        if (deviceEntries.length) {
+          const existingDevices = await prisma.userDevice.findMany({
+            where: { userId: existing.id },
+            select: { mac: true },
+          });
+          const existingMacs = new Set(existingDevices.map((d) => d.mac));
+          for (const entry of deviceEntries) {
+            try {
+              const mac = normalizeMac(entry.macRaw);
+              if (existingMacs.has(mac)) result.devicesUpdated++;
+              else result.devicesCreated++;
+            } catch {
+              /* already validated */
+            }
+          }
+        }
+        result.rows.push({
+          line: row.line,
+          username: existing.username,
+          action: "updated",
+          message: deviceEntries.length
+            ? `would update (+devices ${deviceEntries.length})`
+            : "would update",
+        });
+        continue;
+      }
+
+      try {
+        if (row.password) await assertPasswordNotBreached(row.password);
+
+        const deviceStats = await prisma.$transaction(async (tx) => {
+          if (role === "user" && existing.role === "admin") {
+            const otherAdmins = await tx.user.count({
+              where: { role: "admin", id: { not: existing.id } },
+            });
+            if (otherAdmins === 0) {
+              throw BadRequest("Cannot demote the last admin");
+            }
+          }
+
+          await tx.user.update({
+            where: { id: existing.id },
+            data: {
+              email,
+              fullName,
+              role,
+              status,
+              certEnabled,
+              validFrom: validFrom ? new Date(validFrom) : null,
+              validUntil: validUntil ? new Date(validUntil) : null,
+            },
+          });
+
+          await tx.userGroup.deleteMany({ where: { userId: existing.id } });
+          if (groupIds.length) {
+            await tx.userGroup.createMany({
+              data: groupIds.map((gid, i) => ({
+                userId: existing.id,
+                groupId: gid,
+                priority: i + 1,
+              })),
+            });
+          }
+
+          await syncUserToRadius(tx, existing.id);
+
+          const stats = deviceEntries.length
+            ? await upsertImportedDevices(tx, existing.id, deviceEntries, actorId, req)
+            : { created: 0, updated: 0 };
+
+          await audit({
+            tx,
+            actorId,
+            action: "user_update",
+            targetType: "user",
+            targetId: existing.id,
+            metadata: {
+              username: existing.username,
+              source: "csv_import",
+              devicesCreated: stats.created,
+              devicesUpdated: stats.updated,
+            },
+            req,
+          });
+          return stats;
+        });
+
+        result.devicesCreated += deviceStats.created;
+        result.devicesUpdated += deviceStats.updated;
+
+        if (row.password) {
+          await changeUserPassword({
+            userId: existing.id,
+            newPassword: row.password,
+            actorId,
+            mustChange: false,
+            req,
+          });
+        }
+
+        result.updated++;
+        const deviceMsg =
+          deviceStats.created || deviceStats.updated
+            ? ` (devices +${deviceStats.created}/~${deviceStats.updated})`
+            : "";
+        result.rows.push({
+          line: row.line,
+          username: existing.username,
+          action: "updated",
+          message: (row.password ? "updated (password changed)" : "updated") + deviceMsg,
+        });
+      } catch (err) {
+        fail(err instanceof Error ? err.message : "update failed");
+      }
+    }
+
+    return result;
   });
 
   // GET /admin/users/:id

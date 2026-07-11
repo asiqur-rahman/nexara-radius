@@ -3,6 +3,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { PrismaClient } from "@prisma/client";
 import { hashPassword, ntHash } from "../lib/password.js";
+import { saveReloadCommand, getReloadCommand } from "../lib/freeradius.js";
 import { syncGroupToRadius, syncNasToRadius, syncUserToRadius } from "../services/radiusPolicy.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -179,6 +180,11 @@ export async function runSeed() {
     await syncNasToRadius(tx, nas.id);
   });
 
+  // Ensure web Settings shows a reload command for Docker deployments when unset.
+  if (!(await getReloadCommand())) {
+    await saveReloadCommand("docker kill -s HUP nexara-radius");
+  }
+
   writeSeedLine("Seed complete.");
   writeSeedLine(`  Admin    : ${adminUsername} / ${adminPassword}  (change on first login)`);
   writeSeedLine(`  Test user: ${testUsername} / ${testPassword}`);
@@ -222,6 +228,9 @@ export async function ensureOpenNasIfMissing() {
     await syncNasToRadius(tx, nas.id);
   });
   writeSeedLine(`Open NAS ensured: ${nas.nasname} / secret ${nas.secret}`);
+  if (!(await getReloadCommand())) {
+    await saveReloadCommand("docker kill -s HUP nexara-radius");
+  }
   return nas;
 }
 

@@ -34,6 +34,8 @@ import type {
   UpdateDeviceRequest,
   UserClientCert,
   UserDevice,
+  UserImportRequest,
+  UserImportResult,
   UserSummary,
   UpdateUserRequest,
 } from "@app/shared";
@@ -41,7 +43,7 @@ export type { CaInfo, CertSubjectSettings, FreeRadiusReloadResult, PlatformSetti
 
 // Convenience: NAS mutation responses include an optional auto-reload result.
 type WithReload<T> = T & { _reload?: FreeRadiusReloadResult };
-import { api } from "./client";
+import { api, apiDownload } from "./client";
 
 const v1 = "/api/v1";
 
@@ -62,6 +64,25 @@ export function updateUser(token: string, id: string, body: UpdateUserRequest) {
 }
 export function deleteUser(token: string, id: string) {
   return api<{ ok: true }>(`${v1}/admin/users/${id}`, { method: "DELETE", token });
+}
+export function exportUsersCsv(token: string, q?: { q?: string; status?: string; role?: string }) {
+  const params = new URLSearchParams();
+  if (q?.q) params.set("q", q.q);
+  if (q?.status) params.set("status", q.status);
+  if (q?.role) params.set("role", q.role);
+  const qs = params.toString();
+  const stamp = new Date().toISOString().slice(0, 10);
+  return apiDownload(
+    `${v1}/admin/users/export${qs ? `?${qs}` : ""}`,
+    `nexara-users-${stamp}.csv`,
+    { token },
+  );
+}
+export function downloadUsersImportTemplate(token: string) {
+  return apiDownload(`${v1}/admin/users/import/template`, "nexara-users-template.csv", { token });
+}
+export function importUsers(token: string, body: UserImportRequest) {
+  return api<UserImportResult>(`${v1}/admin/users/import`, { method: "POST", token, body });
 }
 // ── Self-service certs (user portal) ─────────────────────────────────
 export function listMyCerts(token: string) {

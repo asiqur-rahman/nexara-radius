@@ -2,24 +2,28 @@ import { useCallback, useEffect, useState } from "react";
 import {
   CalendarClock,
   ChevronRight,
+  Download,
   Loader2,
   Plus,
   Search,
   ShieldCheck,
   Smartphone,
   Trash2,
+  Upload,
   UserRound,
   X,
 } from "lucide-react";
 import { ApiCallError } from "../api/client";
-import type { AdminDeviceSummary, GroupSummary, UserSummary } from "@app/shared";
+import type { AdminDeviceSummary, GroupSummary, UserImportResult, UserSummary } from "@app/shared";
 import { CreateUserDrawer } from "../components/CreateUserDrawer";
 import { PageHelp } from "../components/PageHelp";
 import { UserEditDrawer } from "../components/UserEditDrawer";
+import { UserImportDrawer } from "../components/UserImportDrawer";
 import { useAuth } from "../auth/AuthContext";
 import {
   deleteAdminDevice,
   deleteUser,
+  exportUsersCsv,
   listGroups,
   listUserDevicesForAdmin,
   listUsers,
@@ -53,6 +57,8 @@ export function LiveUsersView() {
   const [devicesUser,  setDevicesUser]  = useState<UserSummary | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<UserSummary | null>(null);
   const [deleting,     setDeleting]     = useState(false);
+  const [showImport,   setShowImport]   = useState(false);
+  const [exporting,    setExporting]    = useState(false);
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -95,6 +101,29 @@ export function LiveUsersView() {
     setMessage(`Saved changes for ${updated.username}.`);
   };
 
+  const handleExport = async () => {
+    if (!token) return;
+    setExporting(true);
+    try {
+      await exportUsersCsv(token, { q: query || undefined });
+      setMessage("Users CSV exported.");
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Export failed.");
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleImported = (result: UserImportResult) => {
+    void load().catch((err: Error) => setMessage(err.message));
+    setMessage(
+      `Import finished: ${result.created} created, ${result.updated} updated, ${result.skipped} skipped, ${result.failed} failed` +
+        (result.devicesCreated || result.devicesUpdated
+          ? `; devices +${result.devicesCreated}/~${result.devicesUpdated}.`
+          : "."),
+    );
+  };
+
   return (
     <div className="space-y-5">
       {editTarget && (
@@ -104,6 +133,14 @@ export function LiveUsersView() {
           token={token!}
           onClose={() => setEditTarget(null)}
           onSaved={handleSaved}
+        />
+      )}
+
+      {showImport && token && (
+        <UserImportDrawer
+          token={token}
+          onClose={() => setShowImport(false)}
+          onDone={handleImported}
         />
       )}
 
@@ -119,6 +156,7 @@ export function LiveUsersView() {
               tips={[
                 "Users authenticate with PEAP-MSCHAPv2 or EAP-TLS depending on your rollout model",
                 "Group membership drives reply attributes and VLAN policy immediately",
+                "Use Export / Import CSV to bulk manage users — passwords are never exported",
                 "Suspending or deleting a user can trigger session disconnects on active devices",
               ]}
             />
@@ -126,13 +164,31 @@ export function LiveUsersView() {
           <p className="theme-text-muted mt-1 text-sm">{users.length} records displayed</p>
         </div>
 
-        <button
-          onClick={() => setShowAdd((current) => !current)}
-          className="inline-flex items-center justify-center gap-2 rounded-[20px] bg-sky-400 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:brightness-105"
-        >
-          <Plus className="h-4 w-4" />
-          New user
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => void handleExport()}
+            disabled={exporting || !token}
+            className="inline-flex items-center justify-center gap-2 rounded-[20px] border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-semibold text-slate-100 transition hover:bg-white/[0.07] disabled:opacity-50"
+          >
+            {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+            Export
+          </button>
+          <button
+            onClick={() => setShowImport(true)}
+            disabled={!token}
+            className="inline-flex items-center justify-center gap-2 rounded-[20px] border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-semibold text-slate-100 transition hover:bg-white/[0.07] disabled:opacity-50"
+          >
+            <Upload className="h-4 w-4" />
+            Import
+          </button>
+          <button
+            onClick={() => setShowAdd((current) => !current)}
+            className="inline-flex items-center justify-center gap-2 rounded-[20px] bg-sky-400 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:brightness-105"
+          >
+            <Plus className="h-4 w-4" />
+            New user
+          </button>
+        </div>
       </div>
 
       {message && (
