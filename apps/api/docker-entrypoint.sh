@@ -48,7 +48,9 @@ if [ "$NEED_SEED" = "yes" ]; then
   node --openssl-legacy-provider prisma/seed.mjs
   echo "[entrypoint] First-boot seed complete."
 else
-  echo "[entrypoint] Admin already exists — skipping seed."
+  echo "[entrypoint] Admin already exists — skipping full seed."
+  echo "[entrypoint] Ensuring open lab NAS (0.0.0.0/0) exists for web management..."
+  node --openssl-legacy-provider prisma/ensure-open-nas.mjs
 fi
 
 echo "[entrypoint] Starting API server..."

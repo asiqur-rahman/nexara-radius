@@ -143,41 +143,46 @@ export async function runSeed() {
     },
   });
 
-  const nasIp = seedConfig.nas.ip?.trim();
-  const nas = nasIp
-    ? await prisma.nasClient.upsert({
-        where: { nasname: nasIp },
-        update: {},
-        create: {
-          nasname: nasIp,
-          shortname: seedConfig.nas.shortname,
-          secret: seedConfig.nas.secret,
-          type: seedConfig.nas.vendor,
-          enabled: true,
-          coaPort: seedConfig.nas.coaPort,
-          description: seedConfig.nas.description,
-        },
-      })
-    : null;
+  // Default open lab NAS (0.0.0.0/0) so it appears in Admin → NAS and can
+  // be disabled / edited / deleted from the web UI. Override via seed.config.json.
+  const nasIp = seedConfig.nas.ip?.trim() || "0.0.0.0/0";
+  const nas = await prisma.nasClient.upsert({
+    where: { nasname: nasIp },
+    update: {
+      shortname: seedConfig.nas.shortname || "any",
+      secret: seedConfig.nas.secret || "testing123",
+      type: seedConfig.nas.vendor || "other",
+      enabled: true,
+      coaPort: seedConfig.nas.coaPort ?? 3799,
+      description:
+        seedConfig.nas.description ||
+        "Open lab client (any IP) — disable or delete after adding real APs",
+    },
+    create: {
+      nasname: nasIp,
+      shortname: seedConfig.nas.shortname || "any",
+      secret: seedConfig.nas.secret || "testing123",
+      type: seedConfig.nas.vendor || "other",
+      enabled: true,
+      coaPort: seedConfig.nas.coaPort ?? 3799,
+      description:
+        seedConfig.nas.description ||
+        "Open lab client (any IP) — disable or delete after adding real APs",
+    },
+  });
 
   await prisma.$transaction(async (tx) => {
     await syncGroupToRadius(tx, guest.id);
     await syncGroupToRadius(tx, family.id);
     await syncUserToRadius(tx, admin.id);
     await syncUserToRadius(tx, testUser.id);
-    if (nas) {
-      await syncNasToRadius(tx, nas.id);
-    }
+    await syncNasToRadius(tx, nas.id);
   });
 
   writeSeedLine("Seed complete.");
   writeSeedLine(`  Admin    : ${adminUsername} / ${adminPassword}  (change on first login)`);
   writeSeedLine(`  Test user: ${testUsername} / ${testPassword}`);
-  if (nas) {
-    writeSeedLine(`  NAS      : ${nas.nasname} / secret ${seedConfig.nas.secret} / CoA ${nas.coaPort}`);
-  } else {
-    writeSeedLine("  NAS      : skipped (set nas.ip in prisma/seed.config.json to seed your AP)");
-  }
+  writeSeedLine(`  NAS      : ${nas.nasname} / secret ${nas.secret} / CoA ${nas.coaPort}`);
 }
 
 export async function runSeedWithCleanup() {
@@ -187,3 +192,44 @@ export async function runSeedWithCleanup() {
     await prisma.$disconnect();
   }
 }
+
+/** Create the open lab NAS once if the NAS list is empty.
+ *  Does not revive a disabled row. Does not recreate if any NAS already exists
+ *  (so delete sticks after you add real APs, or if you leave the list empty
+ *  intentionally after disabling — disable is preferred over delete). */
+export async function ensureOpenNasIfMissing() {
+  const nasIp = seedConfig.nas?.ip?.trim() || "0.0.0.0/0";
+  const existing = await prisma.nasClient.findUnique({ where: { nasname: nasIp } });
+  if (existing) return existing;
+
+  const otherNas = await prisma.nasClient.count();
+  if (otherNas > 0) return null;
+
+  const nas = await prisma.nasClient.create({
+    data: {
+      nasname: nasIp,
+      shortname: seedConfig.nas?.shortname || "any",
+      secret: seedConfig.nas?.secret || "testing123",
+      type: seedConfig.nas?.vendor || "other",
+      enabled: true,
+      coaPort: seedConfig.nas?.coaPort ?? 3799,
+      description:
+        seedConfig.nas?.description ||
+        "Open lab client (any IP) — disable or delete after adding real APs",
+    },
+  });
+  await prisma.$transaction(async (tx) => {
+    await syncNasToRadius(tx, nas.id);
+  });
+  writeSeedLine(`Open NAS ensured: ${nas.nasname} / secret ${nas.secret}`);
+  return nas;
+}
+
+export async function ensureOpenNasIfMissingWithCleanup() {
+  try {
+    return await ensureOpenNasIfMissing();
+  } finally {
+    await prisma.$disconnect();
+  }
+}
+
