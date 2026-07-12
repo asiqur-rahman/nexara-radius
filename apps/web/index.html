@@ -1,10 +1,24 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en" data-theme="white">
   <head>
     <meta charset="UTF-8" />
 
     <!-- Viewport — viewport-fit=cover for iPhone notch/Dynamic Island safe area -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+
+    <!-- Apply saved theme before paint to avoid a dark→light flash -->
+    <script>
+      (function () {
+        try {
+          var stored = localStorage.getItem("radiusops-theme");
+          document.documentElement.dataset.theme = stored === "current" ? "current" : "white";
+          document.documentElement.style.colorScheme = stored === "current" ? "dark" : "light";
+        } catch (e) {
+          document.documentElement.dataset.theme = "white";
+          document.documentElement.style.colorScheme = "light";
+        }
+      })();
+    </script>
 
     <!-- ── Primary identity ─────────────────────────────────────────── -->
     <title>Nexara</title>
@@ -16,9 +30,9 @@
     <!-- ── PWA / theme colours ──────────────────────────────────────── -->
     <!-- Android Chrome picks up theme-color from the manifest; duplicate here for
          browsers that read it from <meta> (Samsung Internet, older Chrome). -->
-    <meta name="theme-color"            content="#09090b" />
-    <meta name="msapplication-TileColor" content="#09090b" />
-    <meta name="color-scheme"           content="dark" />
+    <meta name="theme-color"            content="#f8fafc" />
+    <meta name="msapplication-TileColor" content="#f8fafc" />
+    <meta name="color-scheme"           content="light dark" />
 
     <!-- ── Favicon ──────────────────────────────────────────────────── -->
     <link rel="icon"       type="image/svg+xml" href="/favicon.svg" />
@@ -28,8 +42,8 @@
     <!-- ── iOS / iPadOS PWA ─────────────────────────────────────────── -->
     <!-- Makes the app open full-screen when launched from the home screen -->
     <meta name="apple-mobile-web-app-capable"            content="yes" />
-    <!-- black-translucent = status bar overlays the app (uses safe-area insets) -->
-    <meta name="apple-mobile-web-app-status-bar-style"   content="black-translucent" />
+    <!-- default = status bar uses light background with dark text -->
+    <meta name="apple-mobile-web-app-status-bar-style"   content="default" />
     <meta name="apple-mobile-web-app-title"              content="Nexara" />
 
     <!-- Apple touch icons — iOS uses the first matching size; provide both -->
@@ -55,7 +69,7 @@
       rel="stylesheet"
     />
   </head>
-  <body class="bg-zinc-950 text-zinc-100 font-sans antialiased">
+  <body class="bg-slate-50 text-slate-900 font-sans antialiased">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

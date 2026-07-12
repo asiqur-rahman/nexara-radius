@@ -18,7 +18,7 @@ import {
   X,
 } from "lucide-react";
 import type { ProvisionUserCertResponse, UserClientCert } from "@app/shared";
-import { listMyCerts, provisionMyCert, revokeMyCert } from "../api/endpoints";
+import { listMyCerts, provisionMyCert, revokeMyCert, downloadMyCertPkcs12 } from "../api/endpoints";
 import { apiDownload } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import { usePortalTheme } from "../theme/portalTheme";
@@ -314,6 +314,7 @@ export function LiveWifiCertView() {
   const [bundle, setBundle] = useState<ProvisionUserCertResponse | null>(null);
   const [provisioning, setProvisioning] = useState(false);
   const [revoking, setRevoking] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null);
 
   const loadCerts = useCallback(async () => {
@@ -361,6 +362,40 @@ export function LiveWifiCertView() {
       setNotice({ ok: false, text: err instanceof Error ? err.message : "Failed to delete certificate" });
     } finally {
       setRevoking(null);
+    }
+  };
+
+  const handleDownloadPkcs12 = async (certId: string, fallbackName: string) => {
+    if (!token) return;
+    setDownloading(certId);
+    setNotice(null);
+    try {
+      const file = await downloadMyCertPkcs12(token, certId);
+      const bin = atob(file.pkcs12Base64);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      const blob = new Blob([bytes], { type: "application/x-pkcs12" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${file.commonName || fallbackName}.p12`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      setNotice({
+        ok: true,
+        text: file.pkcs12Password
+          ? "Downloaded wifi-certificate.p12 — use the P12 password shown below when importing."
+          : "Downloaded wifi-certificate.p12.",
+      });
+    } catch (err) {
+      setNotice({
+        ok: false,
+        text: err instanceof Error ? err.message : "Unable to download .p12 — generate a new certificate.",
+      });
+    } finally {
+      setDownloading(null);
     }
   };
 
@@ -490,66 +525,79 @@ export function LiveWifiCertView() {
         )}
 
         {!loading && !error && certs.length > 0 && (
-          <div className="space-y-2">
+          <div className="space-y-3">
             {certs.map((cert) => {
               const isActive = new Date(cert.expiresAt) >= new Date();
               return (
                 <div
                   key={cert.id}
-                  className={`flex items-start gap-4 p-4 rounded-xl border transition-colors ${t.soft} ${
-                    isActive ? "" : "opacity-60"
-                  }`}
+                  className={`rounded-xl border p-4 transition-colors ${t.soft} ${isActive ? "" : "opacity-60"}`}
                 >
-                  <Key
-                    className={`w-4 h-4 flex-shrink-0 mt-1 ${
-                      isActive ? (t.light ? "text-indigo-600" : "text-sky-300") : t.faint
-                    }`}
-                  />
-                  <div className="flex-1 min-w-0">
-                    <div className={`text-sm font-medium font-mono truncate ${t.title}`}>{cert.commonName}</div>
-                    <div className={`text-xs mt-0.5 truncate font-mono ${t.muted}`}>{cert.fingerprint}</div>
-                    <div className={`text-xs mt-0.5 ${t.faint}`}>
-                      Expires {new Date(cert.expiresAt).toLocaleDateString()}
-                      {cert.notes && ` · ${cert.notes}`}
+                  <div className="flex items-start gap-4">
+                    <Key
+                      className={`w-4 h-4 flex-shrink-0 mt-1 ${
+                        isActive ? (t.light ? "text-indigo-600" : "text-sky-300") : t.faint
+                      }`}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className={`text-sm font-medium font-mono truncate ${t.title}`}>{cert.commonName}</div>
+                      <div className={`text-xs mt-0.5 truncate font-mono ${t.muted}`}>{cert.fingerprint}</div>
+                      <div className={`text-xs mt-0.5 ${t.faint}`}>
+                        Expires {new Date(cert.expiresAt).toLocaleDateString()}
+                        {cert.notes && ` · ${cert.notes}`}
+                      </div>
                     </div>
-                    {isActive && cert.pkcs12Password && <PasswordReveal password={cert.pkcs12Password} />}
+                    <div className="flex items-center gap-1 flex-shrink-0 mt-0.5">
+                      <CertStatusBadge cert={cert} />
+                      {isActive && (
+                        <button
+                          onClick={() => handleRevoke(cert.id)}
+                          disabled={revoking === cert.id}
+                          className={`${t.btnIcon} hover:text-rose-400 disabled:opacity-50`}
+                          title="Delete certificate"
+                        >
+                          {revoking === cert.id ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Trash2 className="w-4 h-4" />
+                          )}
+                        </button>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1 flex-shrink-0 mt-0.5">
-                    <CertStatusBadge cert={cert} />
-                    {cert.certPem && (
-                      <button
-                        onClick={() => {
-                          const blob = new Blob([cert.certPem!], { type: "application/x-pem-file" });
-                          const url = URL.createObjectURL(blob);
-                          const a = document.createElement("a");
-                          a.href = url;
-                          a.download = `${cert.commonName}-cert.pem`;
-                          document.body.appendChild(a);
-                          a.click();
-                          document.body.removeChild(a);
-                          URL.revokeObjectURL(url);
-                        }}
-                        className={t.btnIcon}
-                        title="Download certificate (.pem)"
-                      >
-                        <Download className="w-4 h-4" />
-                      </button>
-                    )}
-                    {isActive && (
-                      <button
-                        onClick={() => handleRevoke(cert.id)}
-                        disabled={revoking === cert.id}
-                        className={`${t.btnIcon} hover:text-rose-400 disabled:opacity-50`}
-                        title="Delete certificate"
-                      >
-                        {revoking === cert.id ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <Trash2 className="w-4 h-4" />
-                        )}
-                      </button>
-                    )}
-                  </div>
+
+                  {isActive && (
+                    <div className={`mt-3 space-y-2 border-t pt-3 ${t.divider}`}>
+                      {cert.pkcs12Password ? (
+                        <PasswordReveal password={cert.pkcs12Password} />
+                      ) : (
+                        <p className={`text-[11px] ${t.faint}`}>
+                          No import password on file for this certificate.
+                        </p>
+                      )}
+
+                      {cert.hasPkcs12 ? (
+                        <button
+                          onClick={() => void handleDownloadPkcs12(cert.id, cert.commonName)}
+                          disabled={downloading === cert.id}
+                          className={`${t.btnPrimary} inline-flex items-center gap-2`}
+                        >
+                          {downloading === cert.id ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Download className="w-4 h-4" />
+                          )}
+                          Download .p12 for import
+                        </button>
+                      ) : (
+                        <p className={`text-xs leading-relaxed ${t.muted}`}>
+                          This older certificate cannot be re-downloaded as a .p12 (private key was not kept).
+                          Generate a new WiFi certificate above, then download the .p12 and use the password shown
+                          here to import it on your device.
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
               );
             })}

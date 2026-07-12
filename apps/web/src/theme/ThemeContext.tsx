@@ -21,9 +21,11 @@ const STORAGE_KEY = "radiusops-theme";
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 function readStoredTheme(): AppTheme {
-  if (typeof window === "undefined") return "current";
+  if (typeof window === "undefined") return "white";
   const stored = window.localStorage.getItem(STORAGE_KEY);
-  return stored === "white" ? "white" : "current";
+  if (stored === "current") return "current";
+  // Default (and any unknown value) → light theme
+  return "white";
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {

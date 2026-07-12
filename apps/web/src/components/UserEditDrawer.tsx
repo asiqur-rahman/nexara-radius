@@ -3,6 +3,7 @@ import {
   AlertTriangle,
   Check,
   Copy,
+  Download,
   Eye,
   EyeOff,
   KeyRound,
@@ -23,7 +24,7 @@ import type {
   UserStatus,
   UserSummary,
 } from "@app/shared";
-import { listUserCerts, provisionUserCert, revokeUserCert, updateUser } from "../api/endpoints";
+import { listUserCerts, provisionUserCert, revokeUserCert, updateUser, downloadUserCertPkcs12 } from "../api/endpoints";
 import { useAuth } from "../auth/AuthContext";
 import { useTheme } from "../theme/ThemeContext";
 
@@ -229,6 +230,23 @@ export function UserEditDrawer({ user, groups, token, onClose, onSaved }: Props)
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
+  };
+
+  const handleDownloadStoredPkcs12 = async (cert: UserClientCert) => {
+    try {
+      const file = await downloadUserCertPkcs12(token, user.id, cert.id);
+      const bytes = Uint8Array.from(atob(file.pkcs12Base64), (char) => char.charCodeAt(0));
+      const url = URL.createObjectURL(new Blob([bytes], { type: "application/x-pkcs12" }));
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${file.commonName || user.username}-wifi.p12`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to download .p12");
+    }
   };
 
   const handleSave = async () => {
@@ -579,9 +597,9 @@ export function UserEditDrawer({ user, groups, token, onClose, onSaved }: Props)
               )}
             </Section>
 
-            <Section eyebrow="Certificates" title="Wi-Fi certs" description="For EAP-TLS access." light={isWhiteTheme}>
+            <Section eyebrow="Certificates" title="Wi-Fi certs" description="EAP-TLS .p12 can be re-downloaded with its import password." light={isWhiteTheme}>
               <div className="flex items-center justify-between gap-3">
-                <div className={`text-sm ${copyClass}`}>Provision once, download once.</div>
+                <div className={`text-sm ${copyClass}`}>Provision a cert, then download .p12 anytime.</div>
                 <button
                   type="button"
                   onClick={handleProvisionCert}
@@ -672,8 +690,19 @@ export function UserEditDrawer({ user, groups, token, onClose, onSaved }: Props)
                             {expired
                               ? `Expired ${new Date(cert.expiresAt).toLocaleDateString()}`
                               : `Expires ${new Date(cert.expiresAt).toLocaleDateString()}`}
+                            {cert.pkcs12Password ? ` · pwd ${cert.pkcs12Password}` : ""}
                           </div>
                         </div>
+                        {!expired && cert.hasPkcs12 && (
+                          <button
+                            type="button"
+                            title="Download .p12"
+                            onClick={() => void handleDownloadStoredPkcs12(cert)}
+                            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition ${isWhiteTheme ? "text-slate-500 hover:bg-sky-50 hover:text-sky-600" : "text-slate-500 hover:bg-sky-500/10 hover:text-sky-200"}`}
+                          >
+                            <Download className="h-4 w-4" />
+                          </button>
+                        )}
                         {!expired ? (
                           <button
                             type="button"

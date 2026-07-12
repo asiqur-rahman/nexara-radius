@@ -1,17 +1,10 @@
 // ─────────────────────────────────────────────────────────────────────
 //  Admin: user-level EAP-TLS client certificate provisioning.
 //
-//  POST /admin/users/:id/provision-cert
-//    Generates a client certificate for a user signed by the platform CA.
-//    The cert is NOT tied to a specific device MAC — any device presenting
-//    this cert will be auto-registered and granted access.
-//
-//  GET  /admin/users/:id/certs
-//    List all provisioned certs for a user (includes decrypted PKCS12 password
-//    for active certs; null for revoked certs).
-//
+//  POST   /admin/users/:id/provision-cert
+//  GET    /admin/users/:id/certs
+//  GET    /admin/users/:id/certs/:certId/pkcs12
 //  DELETE /admin/users/:id/certs/:certId
-//    Revoke a cert (marks revokedAt, blocks future EAP-TLS logins).
 // ─────────────────────────────────────────────────────────────────────
 
 import type { FastifyPluginAsync } from "fastify";
@@ -27,7 +20,10 @@ function decryptPassword(stored: string | null): string | null {
   try { return decrypt(stored); } catch { return null; }
 }
 
-// ── Routes ─────────────────────────────────────────────────────────
+function decryptBlob(stored: string | null): string | null {
+  if (!stored) return null;
+  try { return decrypt(stored); } catch { return null; }
+}
 
 const ProvisionBody = z.object({
   notes:          z.string().max(500).nullable().optional(),
@@ -54,11 +50,38 @@ const adminUserCerts: FastifyPluginAsync = async (app) => {
       commonName:     c.commonName,
       certPem:        c.certPem ?? null,
       pkcs12Password: decryptPassword(c.pkcs12Password),
+      hasPkcs12:      Boolean(c.pkcs12Blob),
       expiresAt:      c.expiresAt.toISOString(),
       notes:          c.notes,
       createdAt:      c.createdAt.toISOString(),
     }));
   });
+
+  // GET /admin/users/:id/certs/:certId/pkcs12
+  app.get<{ Params: { id: string; certId: string } }>(
+    "/users/:id/certs/:certId/pkcs12",
+    async (req, reply) => {
+      const cert = await prisma.userClientCert.findFirst({
+        where: { id: req.params.certId, userId: req.params.id },
+      });
+      if (!cert) throw NotFound("Certificate not found");
+
+      const pkcs12Base64 = decryptBlob(cert.pkcs12Blob);
+      const pkcs12Password = decryptPassword(cert.pkcs12Password);
+      if (!pkcs12Base64) {
+        throw NotFound(
+          "This certificate cannot be re-downloaded. Provision a new certificate to create a fresh .p12 file.",
+        );
+      }
+
+      return reply.send({
+        commonName:     cert.commonName,
+        pkcs12Base64,
+        pkcs12Password,
+        expiresAt:      cert.expiresAt.toISOString(),
+      });
+    },
+  );
 
   // POST /admin/users/:id/provision-cert
   app.post<{ Params: { id: string } }>("/users/:id/provision-cert", async (req, reply) => {
@@ -76,7 +99,6 @@ const adminUserCerts: FastifyPluginAsync = async (app) => {
       pkcs12Password: body.pkcs12Password,
     });
 
-    // One cert per user — delete any existing cert before creating the new one
     await prisma.$transaction([
       prisma.userClientCert.deleteMany({ where: { userId: id } }),
       prisma.userClientCert.create({
@@ -86,6 +108,7 @@ const adminUserCerts: FastifyPluginAsync = async (app) => {
           commonName:     bundle.commonName,
           certPem:        bundle.certificatePem,
           pkcs12Password: encrypt(bundle.pkcs12Password),
+          pkcs12Blob:     encrypt(bundle.pkcs12Base64),
           expiresAt:      bundle.expiresAt,
           notes:          body.notes ?? null,
         },
@@ -112,7 +135,7 @@ const adminUserCerts: FastifyPluginAsync = async (app) => {
     });
   });
 
-  // DELETE /admin/users/:id/certs/:certId  — revoke
+  // DELETE /admin/users/:id/certs/:certId
   app.delete<{ Params: { id: string; certId: string } }>("/users/:id/certs/:certId", async (req) => {
     const actorId = req.currentUser!.sub;
     const cert = await prisma.userClientCert.findFirst({
@@ -120,7 +143,6 @@ const adminUserCerts: FastifyPluginAsync = async (app) => {
     });
     if (!cert) throw NotFound("Certificate not found");
 
-    // Delete entirely — no revokedAt history
     await prisma.userClientCert.delete({ where: { id: cert.id } });
 
     await audit({

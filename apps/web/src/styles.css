@@ -79,10 +79,6 @@
     inset 0 1px 0 rgba(255, 255, 255, 0.82);
 }
 
-:root[data-theme="white"] html {
-  background: #f8fafc;
-}
-
 html,
 body,
 #root {
@@ -90,8 +86,12 @@ body,
 }
 
 html {
-  background: #050c16;
+  background: #f8fafc;
   -webkit-text-size-adjust: 100%;
+}
+
+html[data-theme="current"] {
+  background: #050c16;
 }
 
 body {

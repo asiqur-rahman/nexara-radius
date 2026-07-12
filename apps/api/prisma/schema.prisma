@@ -347,6 +347,9 @@ model UserClientCert {
   /// AES-256-GCM encrypted PKCS12 password (key = MFA_ENCRYPTION_KEY).
   /// Decrypted server-side before returning to the client.
   pkcs12Password String?   @db.VarChar(512)
+  /// AES-256-GCM encrypted PKCS#12 (.p12) base64 blob for re-download.
+  /// Private key material lives only inside this encrypted field.
+  pkcs12Blob     String?   @db.Text
   expiresAt      DateTime
   notes          String?   @db.VarChar(500)
   createdAt      DateTime  @default(now())

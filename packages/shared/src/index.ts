@@ -434,10 +434,12 @@ export interface UserClientCert {
   id:             string;
   fingerprint:    string;
   commonName:     string;
-  /** Public certificate PEM — stored for re-download. Private key is never stored. */
+  /** Public certificate PEM — stored for reference. */
   certPem:        string | null;
   /** PKCS12 password (decrypted server-side). Null for legacy certs without stored password. */
   pkcs12Password: string | null;
+  /** True when the encrypted .p12 can be re-downloaded from the server. */
+  hasPkcs12:      boolean;
   expiresAt:      string;
   revokedAt:      string | null;
   notes:          string | null;

@@ -1,14 +1,10 @@
 // ─────────────────────────────────────────────────────────────────────
 //  Self-service: user manages their own EAP-TLS client certificates.
 //
-//  GET  /me/certs              — list own certs (id, fingerprint, status, expiry, password)
-//  POST /me/certs/provision    — generate a new cert; returns one-time bundle
-//  DELETE /me/certs/:certId    — revoke own cert
-//
-//  Self-service provisioning can be disabled by an admin via
-//  Admin → Settings → Certificates → "Allow users to generate their own certs".
-//  When disabled, POST /me/certs/provision returns 403.
-//  Users can still see certs provisioned by admins (GET) and revoke their own (DELETE).
+//  GET  /me/certs                    — list own certs (+ password, hasPkcs12)
+//  GET  /me/certs/:certId/pkcs12     — re-download encrypted .p12
+//  POST /me/certs/provision          — generate a new cert; returns bundle
+//  DELETE /me/certs/:certId          — revoke own cert
 // ─────────────────────────────────────────────────────────────────────
 
 import type { FastifyPluginAsync } from "fastify";
@@ -26,6 +22,11 @@ const ProvisionBody = z.object({
 });
 
 function decryptPassword(stored: string | null): string | null {
+  if (!stored) return null;
+  try { return decrypt(stored); } catch { return null; }
+}
+
+function decryptBlob(stored: string | null): string | null {
   if (!stored) return null;
   try { return decrypt(stored); } catch { return null; }
 }
@@ -52,11 +53,36 @@ const meCerts: FastifyPluginAsync = async (app) => {
         commonName:     c.commonName,
         certPem:        c.certPem ?? null,
         pkcs12Password: decryptPassword(c.pkcs12Password),
+        hasPkcs12:      Boolean(c.pkcs12Blob),
         expiresAt:      c.expiresAt.toISOString(),
         notes:          c.notes,
         createdAt:      c.createdAt.toISOString(),
       })),
     };
+  });
+
+  // GET /me/certs/:certId/pkcs12 — re-download importable .p12
+  app.get<{ Params: { certId: string } }>("/me/certs/:certId/pkcs12", async (req, reply) => {
+    const userId = req.currentUser!.sub;
+    const cert = await prisma.userClientCert.findFirst({
+      where: { id: req.params.certId, userId },
+    });
+    if (!cert) throw NotFound("Certificate not found");
+
+    const pkcs12Base64 = decryptBlob(cert.pkcs12Blob);
+    const pkcs12Password = decryptPassword(cert.pkcs12Password);
+    if (!pkcs12Base64) {
+      throw NotFound(
+        "This certificate cannot be re-downloaded. Generate a new WiFi certificate to get a fresh .p12 file.",
+      );
+    }
+
+    return reply.send({
+      commonName:     cert.commonName,
+      pkcs12Base64,
+      pkcs12Password,
+      expiresAt:      cert.expiresAt.toISOString(),
+    });
   });
 
   // POST /me/certs/provision
@@ -92,6 +118,7 @@ const meCerts: FastifyPluginAsync = async (app) => {
           commonName:     bundle.commonName,
           certPem:        bundle.certificatePem,
           pkcs12Password: encrypt(bundle.pkcs12Password),
+          pkcs12Blob:     encrypt(bundle.pkcs12Base64),
           expiresAt:      bundle.expiresAt,
           notes:          body.notes ?? null,
         },
@@ -126,7 +153,6 @@ const meCerts: FastifyPluginAsync = async (app) => {
     });
     if (!cert) throw NotFound("Certificate not found");
 
-    // Delete the cert entirely — no revokedAt history
     await prisma.userClientCert.delete({ where: { id: cert.id } });
 
     await audit({

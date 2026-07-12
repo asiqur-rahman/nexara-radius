@@ -118,6 +118,12 @@ export function provisionMyCert(token: string, body: ProvisionUserCertRequest) {
 export function revokeMyCert(token: string, certId: string) {
   return api<{ ok: boolean }>(`${v1}/me/certs/${certId}`, { method: "DELETE", token });
 }
+export function downloadMyCertPkcs12(token: string, certId: string) {
+  return api<{ commonName: string; pkcs12Base64: string; pkcs12Password: string | null; expiresAt: string }>(
+    `${v1}/me/certs/${certId}/pkcs12`,
+    { token },
+  );
+}
 
 // ── Admin: user client certs (EAP-TLS) ───────────────────────────────
 export function listUserCerts(token: string, userId: string) {
@@ -132,6 +138,12 @@ export function revokeUserCert(token: string, userId: string, certId: string) {
   return api<{ ok: boolean }>(`${v1}/admin/users/${userId}/certs/${certId}`, {
     method: "DELETE", token,
   });
+}
+export function downloadUserCertPkcs12(token: string, userId: string, certId: string) {
+  return api<{ commonName: string; pkcs12Base64: string; pkcs12Password: string | null; expiresAt: string }>(
+    `${v1}/admin/users/${userId}/certs/${certId}/pkcs12`,
+    { token },
+  );
 }
 
 // ── Groups ───────────────────────────────────────────────────────────
