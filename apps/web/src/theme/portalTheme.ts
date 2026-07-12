@@ -25,7 +25,7 @@ export function usePortalTheme() {
       divider: "theme-divider",
       input: "theme-input w-full px-3 py-2.5 rounded-lg text-sm",
       btnPrimary: light
-        ? "bg-slate-900 hover:bg-slate-800 text-white text-sm font-medium px-4 py-2.5 rounded-xl transition disabled:opacity-60"
+        ? "bg-sky-600 hover:bg-sky-500 text-white text-sm font-medium px-4 py-2.5 rounded-xl transition disabled:opacity-60"
         : "bg-gradient-to-r from-sky-400 via-cyan-400 to-teal-400 text-slate-950 text-sm font-semibold px-4 py-2.5 rounded-xl shadow-lg shadow-sky-500/20 transition hover:brightness-105 disabled:opacity-60",
       btnGhost: "theme-ghost-button inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium",
       btnIcon: light
@@ -35,7 +35,7 @@ export function usePortalTheme() {
         ? "bg-stone-100 text-stone-600 hover:bg-stone-200"
         : "bg-white/[0.06] text-slate-300 hover:bg-white/[0.1]",
       chipActive: light
-        ? "bg-stone-900 text-white"
+        ? "bg-sky-600 text-white"
         : "bg-sky-400 text-slate-950",
       noticeOk: light
         ? "bg-emerald-50 border-emerald-200 text-emerald-800"
@@ -54,10 +54,10 @@ export function usePortalTheme() {
         ? "border-t border-stone-100 bg-white px-5 py-5 space-y-4"
         : "border-t border-white/6 bg-transparent px-5 py-5 space-y-4",
       stepBadge: light
-        ? "bg-stone-900 text-white"
+        ? "bg-sky-600 text-white"
         : "bg-sky-400/20 text-sky-200",
       methodActive: light
-        ? "border-stone-900 bg-stone-900 text-white"
+        ? "border-sky-600 bg-sky-600 text-white"
         : "border-sky-400 bg-sky-400/15 text-white",
       methodIdle: light
         ? "border-stone-200 bg-stone-50 text-stone-700 hover:border-stone-400"

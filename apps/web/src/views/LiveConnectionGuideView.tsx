@@ -269,9 +269,9 @@ export function LiveConnectionGuideView() {
                 : t.methodIdle
             }`}
           >
-            <Key className={`h-5 w-5 ${method === "peap" ? "text-amber-300" : t.faint}`} />
-            <div className="font-semibold text-sm">Password</div>
-            <div className={`text-xs leading-relaxed ${method === "peap" ? "text-white/75" : t.muted}`}>
+            <Key className={`h-5 w-5 ${method === "peap" ? (t.light ? "text-amber-200" : "text-amber-300") : t.faint}`} />
+            <div className={`font-semibold text-sm ${method === "peap" ? "text-white" : ""}`}>Password</div>
+            <div className={`text-xs leading-relaxed ${method === "peap" ? "text-white/80" : t.muted}`}>
               PEAP-MSCHAPv2 · username + password.
               Works on all devices out of the box.
             </div>
@@ -284,9 +284,9 @@ export function LiveConnectionGuideView() {
                 : t.methodIdle
             }`}
           >
-            <ShieldCheck className={`h-5 w-5 ${method === "eap-tls" ? "text-emerald-400" : t.faint}`} />
-            <div className="font-semibold text-sm">Certificate (EAP-TLS)</div>
-            <div className={`text-xs leading-relaxed ${method === "eap-tls" ? "text-white/75" : t.muted}`}>
+            <ShieldCheck className={`h-5 w-5 ${method === "eap-tls" ? (t.light ? "text-emerald-200" : "text-emerald-400") : t.faint}`} />
+            <div className={`font-semibold text-sm ${method === "eap-tls" ? "text-white" : ""}`}>Certificate (EAP-TLS)</div>
+            <div className={`text-xs leading-relaxed ${method === "eap-tls" ? "text-white/80" : t.muted}`}>
               Phish-proof · no password needed.
               Requires provisioning a certificate first.
             </div>
@@ -318,13 +318,19 @@ export function LiveConnectionGuideView() {
       </div>
 
       {/* CA download */}
-      <div className="bg-gradient-to-br from-stone-900 to-stone-800 rounded-2xl p-5 text-white">
+      <div
+        className={`preserve-on-dark rounded-2xl p-5 ${
+          t.light
+            ? "border border-slate-200 bg-slate-900 text-white"
+            : "bg-gradient-to-br from-stone-900 to-stone-800 text-white"
+        }`}
+      >
         <div className="flex items-start gap-4">
-          <div className="rounded-xl bg-neutral-50/10 p-3">
+          <div className={`rounded-xl p-3 ${t.light ? "bg-white/10" : "bg-neutral-50/10"}`}>
             <Lock className="h-5 w-5 text-amber-300" />
           </div>
           <div className="flex-1">
-            <div className="font-semibold mb-0.5">Download the WiFi CA Certificate</div>
+            <div className="font-semibold mb-0.5 text-white">Download the WiFi CA Certificate</div>
             <p className="text-xs text-white/70 leading-relaxed mb-3">
               Your device must trust the network's Certificate Authority to verify the RADIUS server.
               Install this certificate before connecting.
