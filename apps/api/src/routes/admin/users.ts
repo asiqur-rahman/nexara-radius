@@ -718,7 +718,7 @@ const adminUsers: FastifyPluginAsync = async (app) => {
           fullName: body.fullName,
           role:        body.role ?? "user",
           status:      body.status ?? "active",
-          certEnabled: body.certEnabled ?? true,
+          certEnabled: body.certEnabled ?? false,
           validFrom:   body.validFrom  ? new Date(body.validFrom)  : null,
           validUntil:  body.validUntil ? new Date(body.validUntil) : null,
           secret: {

@@ -110,7 +110,7 @@ export function CreateUserDrawer({ groups, token, onClose, onCreated }: Props) {
   const [role, setRole] = useState<UserRole>("user");
   const [status, setStatus] = useState<"active" | "pending">("active");
   const [groupId,     setGroupId]     = useState<string>("");
-  const [certEnabled, setCertEnabled] = useState<boolean>(true);
+  const [certEnabled, setCertEnabled] = useState<boolean>(false);
   const [validFrom, setValidFrom] = useState("");
   const [validUntil, setValidUntil] = useState("");
   const [busy, setBusy] = useState(false);

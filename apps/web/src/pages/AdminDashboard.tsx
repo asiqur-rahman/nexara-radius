@@ -167,7 +167,11 @@ function viewComponent(view: AdminView) {
 }
 
 function toneClass(active: boolean, isWhiteTheme: boolean) {
-  if (active) return "bg-sky-400/[0.16] text-white ring-1 ring-sky-300/20";
+  if (active) {
+    return isWhiteTheme
+      ? "bg-sky-500 text-white shadow-[0_14px_35px_rgba(14,165,233,0.22)]"
+      : "bg-sky-400/[0.16] text-white ring-1 ring-sky-300/20";
+  }
   return isWhiteTheme
     ? "text-slate-600 hover:bg-slate-100 hover:text-slate-950"
     : "text-slate-400 hover:bg-white/[0.04] hover:text-slate-100";

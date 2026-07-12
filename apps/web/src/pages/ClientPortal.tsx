@@ -107,11 +107,11 @@ export default function ClientPortal() {
                        : "border-white/8 bg-white/[0.04] text-slate-300 hover:bg-white/[0.08] hover:text-white";
   const btnSignOut = L ? "border-slate-200 bg-white/80 text-slate-600 hover:bg-white hover:text-slate-950"
                        : "border-white/8 bg-white/[0.04] text-slate-300 hover:bg-white/[0.08] hover:text-white";
-  const navActive  = L ? "bg-slate-950 text-white shadow-[0_14px_35px_rgba(15,23,42,0.14)]"
+  const navActive  = L ? "bg-sky-500 text-white shadow-[0_14px_35px_rgba(14,165,233,0.22)]"
                        : "bg-sky-400/[0.16] text-white ring-1 ring-sky-300/20";
   const navIdle    = L ? "text-slate-600 hover:bg-slate-100 hover:text-slate-950"
                        : "text-slate-400 hover:bg-white/[0.05] hover:text-slate-100";
-  const navIconActive  = L ? "bg-white/10 text-white"      : "bg-sky-300/10 text-sky-200";
+  const navIconActive  = L ? "bg-white/20 text-white"      : "bg-sky-300/10 text-sky-200";
   const navIconIdle    = L ? "bg-white text-slate-500"     : "bg-white/[0.05] text-slate-400";
   const infoCardBg     = L ? "rounded-[24px] border border-slate-200 bg-white/75 px-4 py-4 shadow-sm"
                            : "rounded-[24px] border border-white/8 bg-white/[0.04] px-4 py-4";
@@ -119,15 +119,16 @@ export default function ClientPortal() {
   const mobileSummaryBg= L ? "bg-white/88 border-slate-200 shadow-[0_18px_40px_rgba(15,23,42,0.08)]"
                            : "bg-[#07111c]/88 border-white/8";
   const tabBarBg       = L ? "bg-white/75 border-slate-200" : "bg-white/[0.04] border-white/8";
-  const tabActive      = L ? "bg-slate-950 text-white shadow-[0_14px_35px_rgba(15,23,42,0.14)]"
-                           : "bg-sky-400 text-slate-950";
+  const tabActive      = L ? "bg-sky-500 text-white shadow-[0_14px_35px_rgba(14,165,233,0.22)]"
+                       : "bg-sky-400 text-slate-950";
   const tabIdle        = L ? "text-slate-600 hover:bg-slate-100 hover:text-slate-950"
-                           : "text-slate-400 hover:bg-white/[0.05] hover:text-white";
+                       : "text-slate-400 hover:bg-white/[0.05] hover:text-white";
   const mobileNavBg    = L ? "surface-light shadow-[0_22px_55px_rgba(15,23,42,0.16)]"
                            : "surface-dark-strong shadow-[0_22px_55px_rgba(2,6,23,0.5)]";
-  const mobileNavActive= L ? "bg-slate-950 text-white"      : "bg-sky-400 text-slate-950";
+  const mobileNavActive= L ? "bg-sky-500 text-white"        : "bg-sky-400 text-slate-950";
   const mobileNavIdle  = L ? "text-slate-500 hover:bg-slate-100 hover:text-slate-950"
                            : "text-slate-400 hover:bg-white/[0.05] hover:text-white";
+  const navDescActive  = L ? "text-white/80" : "text-sky-200/70";
   const menuPanelBg    = L ? "surface-light"                : "surface-dark-strong";
   const menuBorder     = L ? "border-slate-200"             : "border-white/8";
   const menuItemBg     = L ? "bg-white/75 text-slate-600 hover:bg-slate-100 hover:text-slate-950"
@@ -233,8 +234,8 @@ export default function ClientPortal() {
                             <Icon className="h-4.5 w-4.5" />
                           </div>
                           <div className="min-w-0 flex-1">
-                            <div className="font-medium">{item.label}</div>
-                            <div className={`mt-1 text-xs ${active ? (L ? "text-slate-300" : "text-sky-200/70") : faintColor}`}>{item.description}</div>
+                            <div className={`font-medium ${active ? "text-inherit" : ""}`}>{item.label}</div>
+                            <div className={`mt-1 text-xs ${active ? navDescActive : faintColor}`}>{item.description}</div>
                           </div>
                         </button>
                       );
@@ -348,8 +349,8 @@ export default function ClientPortal() {
                         <Icon className="h-4.5 w-4.5" />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <div className="font-medium">{item.label}</div>
-                        <div className={`mt-1 text-xs ${active ? (L ? "text-slate-300" : "text-sky-200/70") : faintColor}`}>{item.description}</div>
+                        <div className={`font-medium ${active ? "text-inherit" : ""}`}>{item.label}</div>
+                        <div className={`mt-1 text-xs ${active ? navDescActive : faintColor}`}>{item.description}</div>
                       </div>
                       <ChevronRight className={`h-4 w-4 ${L ? "text-slate-400" : "text-slate-600"}`} />
                     </button>

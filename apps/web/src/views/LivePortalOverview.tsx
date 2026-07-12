@@ -48,22 +48,34 @@ export function LivePortalOverview() {
   return (
     <div className="space-y-6">
       <div
-        className={`relative overflow-hidden rounded-[28px] p-5 text-white sm:rounded-3xl sm:p-8 ${
+        className={`preserve-on-dark relative overflow-hidden rounded-[28px] p-5 sm:rounded-3xl sm:p-8 ${
           active
-            ? "bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-600"
-            : "bg-gradient-to-br from-slate-700 to-slate-900"
+            ? "bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-600 text-white"
+            : t.light
+              ? "border border-slate-200 bg-gradient-to-br from-slate-100 to-slate-200 text-slate-900"
+              : "bg-gradient-to-br from-slate-700 to-slate-900 text-white"
         }`}
       >
         <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -translate-y-32 translate-x-32 blur-2xl" />
         <div className="relative">
-          <div className="flex items-center gap-2 mb-2 text-white/85">
-            <div className={`w-2 h-2 rounded-full ${active ? "bg-white animate-pulse" : "bg-slate-400"}`} />
+          <div
+            className={`flex items-center gap-2 mb-2 ${
+              active || !t.light ? "text-white/85" : "text-slate-600"
+            }`}
+          >
+            <div
+              className={`w-2 h-2 rounded-full ${
+                active ? "bg-white animate-pulse" : t.light ? "bg-slate-400" : "bg-slate-400"
+              }`}
+            />
             <span className="text-xs font-semibold uppercase tracking-wider">
               {active ? "Connected" : "No active Wi-Fi session"}
             </span>
           </div>
           <h2
-            className="text-[1.65rem] sm:text-3xl font-semibold tracking-tight leading-tight"
+            className={`text-[1.65rem] sm:text-3xl font-semibold tracking-tight leading-tight ${
+              active || !t.light ? "text-white" : "text-slate-900"
+            }`}
             style={{ fontFamily: "ui-serif, Georgia, serif" }}
           >
             {active ? "You're online." : "You're currently offline."}
@@ -72,23 +84,23 @@ export function LivePortalOverview() {
             <div className="mt-4 grid grid-cols-2 gap-3 sm:mt-6 sm:grid-cols-4 sm:gap-4">
               <div>
                 <div className="text-[10px] uppercase tracking-wider text-white/70">Device</div>
-                <div className="mt-1 text-sm font-semibold sm:text-base">
+                <div className="mt-1 text-sm font-semibold sm:text-base text-white">
                   {active.deviceLabel || active.callingStationId}
                 </div>
               </div>
               <div>
                 <div className="text-[10px] uppercase tracking-wider text-white/70">Access Point</div>
-                <div className="mt-1 text-sm font-semibold sm:text-base">{active.nasName || active.nasIp}</div>
+                <div className="mt-1 text-sm font-semibold sm:text-base text-white">{active.nasName || active.nasIp}</div>
               </div>
               <div>
                 <div className="text-[10px] uppercase tracking-wider text-white/70">IP Address</div>
-                <div className="mt-1 text-sm font-semibold font-mono sm:text-base">
+                <div className="mt-1 text-sm font-semibold font-mono sm:text-base text-white">
                   {active.framedIpAddress || "-"}
                 </div>
               </div>
               <div>
                 <div className="text-[10px] uppercase tracking-wider text-white/70">Session</div>
-                <div className="mt-1 text-sm font-semibold sm:text-base">{duration(active.durationSeconds)}</div>
+                <div className="mt-1 text-sm font-semibold sm:text-base text-white">{duration(active.durationSeconds)}</div>
               </div>
             </div>
           )}
