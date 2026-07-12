@@ -519,6 +519,15 @@ export interface PlatformSettingsResponse {
   nac: {
     maxDevicesPerUser: number;  // default 3
   };
+  wifi: {
+    /** Corporate SSID shown as the default in the user portal Wi‑Fi setup. */
+    defaultSsid: string | null;
+  };
+}
+
+/** Authenticated user-facing Wi‑Fi portal config (non-sensitive). */
+export interface WifiPortalConfig {
+  defaultSsid: string | null;
 }
 
 export interface UpdateCaRequest {

@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { HelpCircle, Wifi, Download, Monitor, Smartphone } from "lucide-react";
 import { useAuth } from "../auth/AuthContext";
+import { getMyWifiConfig } from "../api/endpoints";
+import { usePortalTheme } from "../theme/portalTheme";
 
 const BASE = import.meta.env.VITE_API_URL ?? "";
 
@@ -81,9 +83,26 @@ function triggerDownload(content: string, filename: string, mimeType: string) {
 
 export function LiveProfileView() {
   const { user, token } = useAuth();
+  const t = usePortalTheme();
   const [ssid, setSsid] = useState("");
+  const [defaultSsid, setDefaultSsid] = useState<string | null>(null);
   const [caStatus, setCaStatus] = useState<"idle" | "loading" | "error">("idle");
   const [caError, setCaError] = useState("");
+
+  useEffect(() => {
+    if (!token) return;
+    let cancelled = false;
+    getMyWifiConfig(token)
+      .then((cfg) => {
+        if (cancelled) return;
+        setDefaultSsid(cfg.defaultSsid);
+        setSsid((current) => (current.trim() ? current : cfg.defaultSsid ?? ""));
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
 
   if (!user) return null;
   const name = user.fullName || user.username;
@@ -118,27 +137,27 @@ export function LiveProfileView() {
 
   return (
     <div className="space-y-6 max-w-2xl">
-      <div><h2 className="text-2xl font-semibold text-stone-900" style={{ fontFamily: "ui-serif, Georgia, serif" }}>Profile</h2><p className="text-sm text-stone-500 mt-1">Your account information.</p></div>
-      <div className="bg-white border border-stone-200 rounded-2xl p-6">
-        <div className="flex items-center gap-4 pb-5 border-b border-stone-100"><div className="w-16 h-16 rounded-full bg-gradient-to-br from-amber-400 to-rose-500 flex items-center justify-center text-2xl font-semibold text-white">{initials}</div><div><div className="text-lg font-semibold text-stone-900">{name}</div><div className="text-sm text-stone-500">{[user.email, user.phone].filter(Boolean).join(" · ") || user.username}</div></div></div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-5 text-sm"><div><div className="text-xs uppercase text-stone-500">Username</div><div className="font-mono mt-1">{user.username}</div></div><div><div className="text-xs uppercase text-stone-500">Status</div><div className="mt-1 capitalize">{user.status}</div></div><div><div className="text-xs uppercase text-stone-500">Groups</div><div className="mt-1">{user.groups.map((group) => group.name).join(", ") || "None"}</div></div><div><div className="text-xs uppercase text-stone-500">MFA</div><div className="mt-1">{user.mfaEnabled ? "Enabled" : "Disabled"}</div></div></div>
+      <div><h2 className={t.pageTitle} style={{ fontFamily: "ui-serif, Georgia, serif" }}>Profile</h2><p className={t.pageSub}>Your account information.</p></div>
+      <div className={`${t.card} p-6`}>
+        <div className={`flex items-center gap-4 pb-5 border-b ${t.divider}`}><div className="w-16 h-16 rounded-full bg-gradient-to-br from-amber-400 to-rose-500 flex items-center justify-center text-2xl font-semibold text-white">{initials}</div><div><div className={`text-lg font-semibold ${t.title}`}>{name}</div><div className={`text-sm ${t.muted}`}>{[user.email, user.phone].filter(Boolean).join(" · ") || user.username}</div></div></div>
+        <div className={`grid grid-cols-1 sm:grid-cols-2 gap-4 pt-5 text-sm ${t.body}`}><div><div className={`text-xs uppercase ${t.muted}`}>Username</div><div className={`font-mono mt-1 ${t.title}`}>{user.username}</div></div><div><div className={`text-xs uppercase ${t.muted}`}>Status</div><div className="mt-1 capitalize">{user.status}</div></div><div><div className={`text-xs uppercase ${t.muted}`}>Groups</div><div className="mt-1">{user.groups.map((group) => group.name).join(", ") || "None"}</div></div><div><div className={`text-xs uppercase ${t.muted}`}>MFA</div><div className="mt-1">{user.mfaEnabled ? "Enabled" : "Disabled"}</div></div></div>
       </div>
 
       {/* WiFi Setup */}
-      <div className="bg-white border border-stone-200 rounded-2xl p-6 space-y-5">
-        <div className="flex items-center gap-2 pb-4 border-b border-stone-100">
-          <Wifi className="w-5 h-5 text-stone-400" />
+      <div className={`${t.card} p-6 space-y-5`}>
+        <div className={`flex items-center gap-2 pb-4 border-b ${t.divider}`}>
+          <Wifi className={`w-5 h-5 ${t.faint}`} />
           <div>
-            <div className="font-semibold text-stone-900 text-sm">WiFi Setup</div>
-            <div className="text-xs text-stone-500 mt-0.5">Downloads to connect this device to the corporate network.</div>
+            <div className={`font-semibold text-sm ${t.title}`}>WiFi Setup</div>
+            <div className={`text-xs mt-0.5 ${t.muted}`}>Downloads to connect this device to the corporate network.</div>
           </div>
         </div>
 
         {/* CA Certificate */}
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
           <div>
-            <div className="text-sm font-medium text-stone-800">CA Certificate</div>
-            <div className="text-xs text-stone-500 mt-0.5 max-w-xs">
+            <div className={`text-sm font-medium ${t.title}`}>CA Certificate</div>
+            <div className={`text-xs mt-0.5 max-w-xs ${t.muted}`}>
               Install on Windows, macOS, or iOS to trust the WiFi server certificate.
               Required once per device — skip on Android (it prompts automatically).
             </div>
@@ -149,7 +168,7 @@ export function LiveProfileView() {
           <button
             onClick={downloadCa}
             disabled={caStatus === "loading"}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-stone-200 text-sm text-stone-700 hover:bg-stone-50 disabled:opacity-50 whitespace-nowrap shrink-0"
+            className={`${t.btnGhost} px-3 py-1.5 rounded-lg disabled:opacity-50 whitespace-nowrap shrink-0`}
           >
             <Download className="w-4 h-4" />
             {caStatus === "loading" ? "Downloading…" : "wifi-ca.pem"}
@@ -157,47 +176,53 @@ export function LiveProfileView() {
         </div>
 
         {/* Windows Profile */}
-        <div className="flex items-start gap-4 pt-4 border-t border-stone-100">
+        <div className={`flex items-start gap-4 pt-4 border-t ${t.divider}`}>
           <div className="flex-1">
-            <div className="flex items-center gap-1.5 text-sm font-medium text-stone-800">
-              <Monitor className="w-4 h-4 text-stone-400" />
+            <div className={`flex items-center gap-1.5 text-sm font-medium ${t.title}`}>
+              <Monitor className={`w-4 h-4 ${t.faint}`} />
               Windows 11 Profile
             </div>
-            <div className="text-xs text-stone-500 mt-0.5 mb-2">
+            <div className={`text-xs mt-0.5 mb-2 ${t.muted}`}>
               Pre-configured WPA2-Enterprise XML profile. Double-click after download,
               or run: <span className="font-mono">netsh wlan add profile filename=&lt;file&gt;</span>
             </div>
             <div className="flex items-center gap-2">
               <input
                 type="text"
-                placeholder="WiFi network name (SSID)"
+                maxLength={32}
+                placeholder={defaultSsid || "WiFi network name (SSID)"}
                 value={ssid}
                 onChange={(e) => setSsid(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && downloadWindowsProfile()}
-                className="flex-1 text-sm border border-stone-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                className={`${t.input} flex-1 py-1.5`}
               />
               <button
                 onClick={downloadWindowsProfile}
                 disabled={!ssid.trim()}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-stone-200 text-sm text-stone-700 hover:bg-stone-50 disabled:opacity-40 whitespace-nowrap"
+                className={`${t.btnGhost} gap-1.5 px-3 py-1.5 rounded-lg disabled:opacity-40 whitespace-nowrap`}
               >
                 <Download className="w-4 h-4" />
                 Download
               </button>
             </div>
+            {defaultSsid && ssid.trim() === defaultSsid && (
+              <p className={`mt-1.5 text-[11px] ${t.faint}`}>
+                Prefill from admin default SSID. You can change it before downloading.
+              </p>
+            )}
           </div>
         </div>
 
         {/* Android hint */}
-        <div className="flex items-center gap-2 pt-3 border-t border-stone-100">
-          <Smartphone className="w-4 h-4 text-stone-400 shrink-0" />
-          <p className="text-xs text-stone-500">
-            <span className="font-medium text-stone-600">Android / iOS:</span> Select the network, choose EAP = PEAP, Phase 2 = MSCHAPv2, enter your username and password. No certificate needed.
+        <div className={`flex items-center gap-2 pt-3 border-t ${t.divider}`}>
+          <Smartphone className={`w-4 h-4 shrink-0 ${t.faint}`} />
+          <p className={`text-xs ${t.muted}`}>
+            <span className={`font-medium ${t.body}`}>Android / iOS:</span> Select the network, choose EAP = PEAP, Phase 2 = MSCHAPv2, enter your username and password. No certificate needed.
           </p>
         </div>
       </div>
 
-      <div className="bg-stone-50 border border-stone-200 rounded-2xl p-5 flex items-center gap-4"><HelpCircle className="w-5 h-5 text-stone-400" /><div className="text-sm text-stone-700">Contact an administrator to update your name or email address.</div></div>
+      <div className={`${t.soft} p-5 flex items-center gap-4`}><HelpCircle className={`w-5 h-5 ${t.faint}`} /><div className={`text-sm ${t.body}`}>Contact an administrator to update your name or email address.</div></div>
     </div>
   );
 }

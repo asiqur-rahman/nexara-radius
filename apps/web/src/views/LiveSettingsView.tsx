@@ -27,6 +27,7 @@ import {
   ToggleRight,
   Upload,
   Users,
+  Wifi,
 } from "lucide-react";
 import type { CaInfo, CertSeverity, EapCertificate, SystemBackupRestoreResult } from "@app/shared";
 import {
@@ -1547,6 +1548,97 @@ function NacPanel({ token }: { token: string }) {
   );
 }
 
+// ── Wi‑Fi Network Panel ────────────────────────────────────────────────────
+
+function WifiNetworkPanel({ token }: { token: string }) {
+  const [ssid, setSsid] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null);
+
+  useEffect(() => {
+    getPlatformSettings(token)
+      .then((s) => setSsid(s.wifi?.defaultSsid ?? ""))
+      .catch(() => {});
+  }, [token]);
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const value = ssid.trim();
+    if (value.length > 32) {
+      setNotice({ ok: false, text: "SSID must be 32 characters or fewer." });
+      return;
+    }
+    setBusy(true);
+    setNotice(null);
+    try {
+      await updatePlatformSettings(token, { wifi: { defaultSsid: value || null } });
+      setSsid(value);
+      setNotice({
+        ok: true,
+        text: value
+          ? `Default SSID set to “${value}”. Users will see this in Profile → WiFi Setup.`
+          : "Default SSID cleared. Users must enter the network name manually.",
+      });
+    } catch (err) {
+      setNotice({ ok: false, text: err instanceof Error ? err.message : "Failed to save." });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section className="rounded-[28px] border border-white/8 bg-white/[0.03] px-5 py-5">
+      <div className="mb-5 flex items-center gap-3">
+        <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-sky-500/15">
+          <Wifi className="h-4.5 w-4.5 text-sky-300" />
+        </div>
+        <div>
+          <div className="text-[11px] uppercase tracking-[0.28em] text-slate-500">Wi‑Fi Network</div>
+          <div className="mt-1 text-base font-semibold text-white">Default SSID</div>
+        </div>
+      </div>
+
+      {notice && (
+        <div
+          className={`mb-4 rounded-[18px] border px-4 py-3 text-sm ${
+            notice.ok
+              ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-200"
+              : "border-rose-500/20 bg-rose-500/10 text-rose-200"
+          }`}
+        >
+          {notice.text}
+        </div>
+      )}
+
+      <form onSubmit={handleSave} className="flex flex-col gap-4 sm:flex-row sm:items-end">
+        <div className="flex-1 max-w-md">
+          <label className="mb-2 block text-[11px] font-medium uppercase tracking-[0.24em] text-slate-500">
+            Corporate SSID
+          </label>
+          <input
+            type="text"
+            maxLength={32}
+            value={ssid}
+            onChange={(e) => setSsid(e.target.value)}
+            placeholder="e.g. Company-Secure"
+            className="w-full rounded-[20px] border border-white/8 bg-slate-950/70 px-4 py-3 text-sm text-white outline-none focus:border-sky-400/40"
+          />
+          <p className="mt-1.5 text-xs text-slate-500">
+            Prefills the Windows profile SSID field in the user portal. Users can still edit it before download.
+          </p>
+        </div>
+        <button
+          disabled={busy}
+          className="inline-flex items-center gap-2 rounded-[20px] bg-sky-400 px-5 py-3 text-sm font-semibold text-slate-950 transition hover:brightness-105 disabled:opacity-60"
+        >
+          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+          Save
+        </button>
+      </form>
+    </section>
+  );
+}
+
 // ── System Backup / Restore panel ──────────────────────────────────────────
 
 function BackupRestorePanel({ token }: { token: string }) {
@@ -1763,6 +1855,7 @@ export function LiveSettingsView() {
       </div>
 
       <NacPanel token={token} />
+      <WifiNetworkPanel token={token} />
       <CaPanel token={token} />
       <CertSettingsPanel token={token} />
       <FreeRadiusPanel token={token} />

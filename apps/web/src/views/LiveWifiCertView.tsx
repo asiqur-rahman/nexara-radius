@@ -21,37 +21,52 @@ import type { ProvisionUserCertResponse, UserClientCert } from "@app/shared";
 import { listMyCerts, provisionMyCert, revokeMyCert } from "../api/endpoints";
 import { apiDownload } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
+import { usePortalTheme } from "../theme/portalTheme";
 
 function CertStatusBadge({ cert }: { cert: UserClientCert }) {
   const expired = new Date(cert.expiresAt) < new Date();
-  if (expired) return <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700">Expired</span>;
-  return <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">Active</span>;
+  if (expired) {
+    return (
+      <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/20">
+        Expired
+      </span>
+    );
+  }
+  return (
+    <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/20">
+      Active
+    </span>
+  );
 }
 
 function useCopyText() {
   const [copied, setCopied] = useState<string | null>(null);
   const copy = useCallback(async (text: string, key: string) => {
-    try { await navigator.clipboard.writeText(text); } catch { /* ignore */ }
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      /* ignore */
+    }
     setCopied(key);
     setTimeout(() => setCopied(null), 2000);
   }, []);
   return { copied, copy };
 }
 
-/** Inline password reveal — shown in the cert list for active certs. */
 function PasswordReveal({ password }: { password: string }) {
+  const t = usePortalTheme();
   const [visible, setVisible] = useState(false);
   const { copied, copy } = useCopyText();
 
   return (
     <div className="flex items-center gap-1.5 mt-1">
-      <span className="text-[11px] text-stone-400 font-medium">P12 password:</span>
-      <code className="text-[11px] font-mono text-stone-700 bg-stone-100 rounded px-1.5 py-0.5 select-all">
+      <span className={`text-[11px] font-medium ${t.faint}`}>P12 password:</span>
+      <code className={`text-[11px] font-mono rounded px-1.5 py-0.5 select-all ${t.soft} ${t.title}`}>
         {visible ? password : "••••••••••••"}
       </code>
       <button
         onClick={() => setVisible((v) => !v)}
-        className="p-0.5 hover:bg-stone-200 rounded text-stone-400 hover:text-stone-700 transition-colors"
+        className={t.btnIcon}
         title={visible ? "Hide password" : "Show password"}
       >
         {visible ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
@@ -59,10 +74,10 @@ function PasswordReveal({ password }: { password: string }) {
       {visible && (
         <button
           onClick={() => copy(password, "pwd-" + password.slice(0, 4))}
-          className="p-0.5 hover:bg-stone-200 rounded text-stone-400 hover:text-stone-700 transition-colors"
+          className={t.btnIcon}
           title="Copy password"
         >
-          {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+          {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
         </button>
       )}
     </div>
@@ -76,6 +91,7 @@ function BundleDownloadPanel({
   bundle: ProvisionUserCertResponse;
   onDismiss: () => void;
 }) {
+  const t = usePortalTheme();
   const { copied, copy } = useCopyText();
 
   const downloadFile = (content: string, filename: string, mime: string) => {
@@ -106,20 +122,36 @@ function BundleDownloadPanel({
   };
 
   return (
-    <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-6 space-y-4">
+    <div
+      className={`rounded-2xl p-6 space-y-4 border ${
+        t.light
+          ? "bg-amber-50 border-amber-300"
+          : "bg-amber-500/10 border-amber-500/30"
+      }`}
+    >
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-start gap-3">
-          <div className="w-10 h-10 rounded-xl bg-amber-200 flex items-center justify-center flex-shrink-0">
-            <Key className="w-5 h-5 text-amber-800" />
+          <div
+            className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
+              t.light ? "bg-amber-200 text-amber-800" : "bg-amber-400/20 text-amber-200"
+            }`}
+          >
+            <Key className="w-5 h-5" />
           </div>
           <div>
-            <h3 className="font-semibold text-amber-900">Certificate ready — download your .p12 now</h3>
-            <p className="text-xs text-amber-800 mt-1 leading-relaxed max-w-lg">
-              Download the <strong>.p12 file</strong> — you cannot re-download it later (the private key is not stored on the server). The password is saved and always visible in your cert list below.
+            <h3 className={`font-semibold ${t.light ? "text-amber-900" : "text-amber-100"}`}>
+              Certificate ready — download your .p12 now
+            </h3>
+            <p className={`text-xs mt-1 leading-relaxed max-w-lg ${t.light ? "text-amber-800" : "text-amber-200/80"}`}>
+              Download the <strong>.p12 file</strong> — you cannot re-download it later (the private key is not
+              stored on the server). The password is saved and always visible in your cert list below.
             </p>
           </div>
         </div>
-        <button onClick={onDismiss} className="text-amber-600 hover:text-amber-900 mt-0.5 flex-shrink-0">
+        <button
+          onClick={onDismiss}
+          className={`mt-0.5 flex-shrink-0 ${t.light ? "text-amber-600 hover:text-amber-900" : "text-amber-300 hover:text-amber-100"}`}
+        >
           <X className="w-5 h-5" />
         </button>
       </div>
@@ -134,32 +166,39 @@ function BundleDownloadPanel({
         </button>
         <button
           onClick={() => downloadFile(bundle.certificatePem, "wifi-cert.pem", "application/x-pem-file")}
-          className="flex items-center justify-center gap-2 bg-white border border-amber-300 hover:bg-amber-50 text-amber-900 text-sm font-medium px-4 py-3 rounded-xl transition-colors"
+          className={`flex items-center justify-center gap-2 text-sm font-medium px-4 py-3 rounded-xl transition-colors border ${
+            t.light
+              ? "bg-white border-amber-300 hover:bg-amber-50 text-amber-900"
+              : "bg-white/[0.04] border-amber-500/30 hover:bg-white/[0.08] text-amber-100"
+          }`}
         >
           <Download className="w-4 h-4" />
           Download cert.pem (optional)
         </button>
       </div>
 
-      <div className="bg-white border border-amber-200 rounded-xl p-4 space-y-2">
-        <div className="text-xs font-semibold text-amber-800 uppercase tracking-wider">P12 Password</div>
+      <div className={`${t.soft} p-4 space-y-2`}>
+        <div className={`text-xs font-semibold uppercase tracking-wider ${t.light ? "text-amber-800" : "text-amber-200"}`}>
+          P12 Password
+        </div>
         <div className="flex items-center gap-2">
-          <code className="flex-1 font-mono text-sm text-stone-900 bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 select-all break-all">
-            {bundle.pkcs12Password}
-          </code>
+          <code className={`flex-1 select-all break-all ${t.code}`}>{bundle.pkcs12Password}</code>
           <button
             onClick={() => copy(bundle.pkcs12Password, "pwd")}
-            className="p-2 hover:bg-amber-100 rounded-lg text-amber-700 transition-colors flex-shrink-0"
+            className={t.btnIcon}
             title="Copy password"
           >
-            {copied === "pwd" ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
+            {copied === "pwd" ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
           </button>
         </div>
-        <p className="text-[11px] text-amber-700">You'll need this password when importing the .p12 on your device. It's also visible any time in your cert list below.</p>
+        <p className={`text-[11px] ${t.light ? "text-amber-700" : "text-amber-200/70"}`}>
+          You'll need this password when importing the .p12 on your device. It's also visible any time in your
+          cert list below.
+        </p>
       </div>
 
-      <div className="text-xs text-stone-900 font-semibold">
-        Common name: <code className="font-mono text-stone-600">{bundle.commonName}</code>
+      <div className={`text-xs font-semibold ${t.title}`}>
+        Common name: <code className={`font-mono ${t.muted}`}>{bundle.commonName}</code>
         &nbsp;·&nbsp; Expires: {new Date(bundle.expiresAt).toLocaleDateString()}
       </div>
     </div>
@@ -215,36 +254,32 @@ const PLATFORM_GUIDES: Record<Platform, { label: string; steps: string[] }> = {
 };
 
 function InstallGuide() {
+  const t = usePortalTheme();
   const [platform, setPlatform] = useState<Platform>("ios");
   const [open, setOpen] = useState(false);
   const guide = PLATFORM_GUIDES[platform];
 
   return (
-    <div className="bg-white border border-stone-200 rounded-2xl overflow-hidden">
-      <button
-        onClick={() => setOpen((p) => !p)}
-        className="w-full flex items-center justify-between px-6 py-4 text-left hover:bg-stone-50 transition-colors"
-      >
+    <div className={`${t.card} overflow-hidden`}>
+      <button onClick={() => setOpen((p) => !p)} className={t.accordionBtn}>
         <div className="flex items-center gap-3">
-          <Wifi className="w-5 h-5 text-indigo-600" />
+          <Wifi className={`w-5 h-5 ${t.light ? "text-indigo-600" : "text-sky-300"}`} />
           <div>
-            <div className="font-semibold text-stone-900 text-sm">How to install on your device</div>
-            <div className="text-xs text-stone-500">Step-by-step guide for iOS, macOS, Windows, Android</div>
+            <div className={`font-semibold text-sm ${t.title}`}>How to install on your device</div>
+            <div className={`text-xs ${t.muted}`}>Step-by-step guide for iOS, macOS, Windows, Android</div>
           </div>
         </div>
-        {open ? <ChevronUp className="w-4 h-4 text-stone-400" /> : <ChevronDown className="w-4 h-4 text-stone-400" />}
+        {open ? <ChevronUp className={`w-4 h-4 ${t.faint}`} /> : <ChevronDown className={`w-4 h-4 ${t.faint}`} />}
       </button>
       {open && (
-        <div className="px-6 pb-6 space-y-4 border-t border-stone-100">
-          <div className="flex gap-2 pt-4 flex-wrap">
+        <div className={t.accordionBody}>
+          <div className="flex gap-2 flex-wrap">
             {(Object.keys(PLATFORM_GUIDES) as Platform[]).map((p) => (
               <button
                 key={p}
                 onClick={() => setPlatform(p)}
                 className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                  platform === p
-                    ? "bg-stone-900 text-white"
-                    : "bg-stone-100 text-stone-600 hover:bg-stone-200"
+                  platform === p ? t.chipActive : t.chipIdle
                 }`}
               >
                 {PLATFORM_GUIDES[p].label}
@@ -254,10 +289,12 @@ function InstallGuide() {
           <ol className="space-y-2.5">
             {guide.steps.map((step, i) => (
               <li key={i} className="flex items-start gap-3">
-                <span className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-xs font-semibold flex-shrink-0 mt-0.5">
+                <span
+                  className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-semibold flex-shrink-0 mt-0.5 ${t.stepBadge}`}
+                >
                   {i + 1}
                 </span>
-                <span className="text-sm text-stone-700 leading-relaxed">{step}</span>
+                <span className={`text-sm leading-relaxed ${t.body}`}>{step}</span>
               </li>
             ))}
           </ol>
@@ -268,6 +305,7 @@ function InstallGuide() {
 }
 
 export function LiveWifiCertView() {
+  const t = usePortalTheme();
   const { token } = useAuth();
   const [certs, setCerts] = useState<UserClientCert[]>([]);
   const [userSelfService, setUserSelfService] = useState(true);
@@ -291,7 +329,9 @@ export function LiveWifiCertView() {
     }
   }, [token]);
 
-  useEffect(() => { loadCerts(); }, [loadCerts]);
+  useEffect(() => {
+    loadCerts();
+  }, [loadCerts]);
 
   const activeCerts = certs.filter((c) => new Date(c.expiresAt) >= new Date());
 
@@ -336,38 +376,39 @@ export function LiveWifiCertView() {
   return (
     <div className="space-y-6 max-w-3xl">
       <div>
-        <h2 className="text-2xl font-semibold text-stone-900 tracking-tight" style={{ fontFamily: "ui-serif, Georgia, serif" }}>
+        <h2 className={t.pageTitle} style={{ fontFamily: "ui-serif, Georgia, serif" }}>
           WiFi Certificate
         </h2>
-        <p className="text-sm text-stone-500 mt-1">
-          Certificate-based (EAP-TLS) access — connect without a password. Your identity is proven by a private key that never leaves your device.
+        <p className={t.pageSub}>
+          Certificate-based (EAP-TLS) access — connect without a password. Your identity is proven by a private
+          key that never leaves your device.
         </p>
       </div>
 
       {notice && (
-        <div
-          className={`border rounded-xl px-4 py-3 text-sm flex items-start gap-2 ${
-            notice.ok ? "bg-emerald-50 border-emerald-200 text-emerald-800" : "bg-rose-50 border-rose-200 text-rose-800"
-          }`}
-        >
-          {notice.ok ? <CheckCircle2 className="w-4 h-4 mt-0.5 flex-shrink-0" /> : <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />}
+        <div className={`border rounded-xl px-4 py-3 text-sm flex items-start gap-2 ${notice.ok ? t.noticeOk : t.noticeErr}`}>
+          {notice.ok ? (
+            <CheckCircle2 className="w-4 h-4 mt-0.5 flex-shrink-0" />
+          ) : (
+            <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+          )}
           <span>{notice.text}</span>
         </div>
       )}
 
-      {/* One-time bundle */}
       {bundle && <BundleDownloadPanel bundle={bundle} onDismiss={() => setBundle(null)} />}
 
-      {/* How it works + generate */}
-      <div className="bg-white border border-stone-200 rounded-2xl p-6 space-y-5">
+      <div className={`${t.card} p-6 space-y-5`}>
         <div className="flex items-start gap-4">
-          <div className="w-11 h-11 rounded-xl bg-indigo-50 flex items-center justify-center flex-shrink-0">
-            <ShieldCheck className="w-5 h-5 text-indigo-600" />
+          <div className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 ${t.iconBox}`}>
+            <ShieldCheck className="w-5 h-5" />
           </div>
           <div>
-            <h3 className="font-semibold text-stone-900">How certificate authentication works</h3>
-            <p className="text-xs text-stone-500 mt-1 leading-relaxed max-w-lg">
-              You receive a personal certificate (.p12 file). Install it on any of your devices. When connecting to the corporate WiFi, your device presents this certificate instead of a username and password. The network verifies it was signed by the company CA.
+            <h3 className={`font-semibold ${t.title}`}>How certificate authentication works</h3>
+            <p className={`text-xs mt-1 leading-relaxed max-w-lg ${t.muted}`}>
+              You receive a personal certificate (.p12 file). Install it on any of your devices. When connecting
+              to the corporate WiFi, your device presents this certificate instead of a username and password.
+              The network verifies it was signed by the company CA.
             </p>
           </div>
         </div>
@@ -378,69 +419,70 @@ export function LiveWifiCertView() {
             { icon: ShieldCheck, text: "Signed by the company CA — tamper-proof" },
             { icon: Wifi, text: "Connect from any approved device, no password" },
           ].map(({ icon: Icon, text }, i) => (
-            <div key={i} className="flex items-start gap-2.5 bg-stone-50 rounded-xl p-3">
-              <Icon className="w-4 h-4 text-indigo-600 mt-0.5 flex-shrink-0" />
-              <span className="text-xs text-stone-700 leading-relaxed">{text}</span>
+            <div key={i} className={`flex items-start gap-2.5 p-3 ${t.soft}`}>
+              <Icon className={`w-4 h-4 mt-0.5 flex-shrink-0 ${t.light ? "text-indigo-600" : "text-sky-300"}`} />
+              <span className={`text-xs leading-relaxed ${t.body}`}>{text}</span>
             </div>
           ))}
         </div>
 
         <div className="flex items-center gap-3 pt-2 flex-wrap">
           {userSelfService ? (
-            <button
-              onClick={handleProvision}
-              disabled={provisioning}
-              className="flex items-center gap-2 bg-stone-900 hover:bg-stone-800 disabled:opacity-60 text-white text-sm font-medium px-5 py-2.5 rounded-xl transition-colors"
-            >
+            <button onClick={handleProvision} disabled={provisioning} className={`flex items-center gap-2 ${t.btnPrimary}`}>
               {provisioning ? (
-                <><Loader2 className="w-4 h-4 animate-spin" />Generating…</>
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Generating…
+                </>
               ) : (
-                <><Key className="w-4 h-4" />Generate My WiFi Certificate</>
+                <>
+                  <Key className="w-4 h-4" />
+                  Generate My WiFi Certificate
+                </>
               )}
             </button>
           ) : (
-            <div className="flex items-center gap-2 bg-stone-100 text-stone-500 text-sm px-4 py-2.5 rounded-xl border border-stone-200">
+            <div className={`flex items-center gap-2 text-sm px-4 py-2.5 ${t.soft} ${t.muted}`}>
               <Lock className="w-4 h-4 flex-shrink-0" />
-              <span>Certificate generation is managed by your administrator. Certs issued for you appear in the list below.</span>
+              <span>
+                Certificate generation is managed by your administrator. Certs issued for you appear in the list
+                below.
+              </span>
             </div>
           )}
-          <button
-            onClick={downloadCa}
-            className="flex items-center gap-2 border border-stone-200 hover:bg-stone-50 text-stone-700 text-sm font-medium px-4 py-2.5 rounded-xl transition-colors"
-          >
-            <Download className="w-4 h-4" />Download CA Certificate
+          <button onClick={downloadCa} className={t.btnGhost}>
+            <Download className="w-4 h-4" />
+            Download CA Certificate
           </button>
         </div>
         {userSelfService && (
-          <p className="text-[11px] text-stone-400">
-            Generating a new certificate replaces your existing one. Save the .p12 file immediately — the private key is not stored on the server. The password is always visible in the cert list below.
+          <p className={`text-[11px] ${t.faint}`}>
+            Generating a new certificate replaces your existing one. Save the .p12 file immediately — the private
+            key is not stored on the server. The password is always visible in the cert list below.
           </p>
         )}
       </div>
 
-      {/* Certificate list */}
-      <div className="bg-white border border-stone-200 rounded-2xl p-6 space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="font-semibold text-stone-900">Your certificates</h3>
-            <p className="text-xs text-stone-500 mt-0.5">
-              {loading ? "Loading…" : activeCerts.length === 0 ? "No active certificate" : "1 active certificate"}
-            </p>
-          </div>
+      <div className={`${t.card} p-6 space-y-4`}>
+        <div>
+          <h3 className={`font-semibold ${t.title}`}>Your certificates</h3>
+          <p className={`text-xs mt-0.5 ${t.muted}`}>
+            {loading ? "Loading…" : activeCerts.length === 0 ? "No active certificate" : "1 active certificate"}
+          </p>
         </div>
 
         {loading && (
-          <div className="flex items-center justify-center py-8 text-stone-400">
+          <div className={`flex items-center justify-center py-8 ${t.faint}`}>
             <Loader2 className="w-5 h-5 animate-spin mr-2" /> Loading certificates…
           </div>
         )}
 
         {!loading && error && (
-          <div className="text-sm text-rose-700 bg-rose-50 border border-rose-200 rounded-xl px-4 py-3">{error}</div>
+          <div className={`text-sm border rounded-xl px-4 py-3 ${t.noticeErr}`}>{error}</div>
         )}
 
         {!loading && !error && certs.length === 0 && (
-          <div className="text-center py-8 text-stone-400 text-sm">
+          <div className={`text-center py-8 text-sm ${t.faint}`}>
             {userSelfService
               ? "No certificates yet. Generate one above to get started."
               : "No certificates have been issued for you yet. Contact your administrator."}
@@ -454,21 +496,23 @@ export function LiveWifiCertView() {
               return (
                 <div
                   key={cert.id}
-                  className={`flex items-start gap-4 p-4 rounded-xl border transition-colors ${
-                    isActive ? "bg-stone-50 border-stone-200" : "bg-stone-50/40 border-stone-100 opacity-60"
+                  className={`flex items-start gap-4 p-4 rounded-xl border transition-colors ${t.soft} ${
+                    isActive ? "" : "opacity-60"
                   }`}
                 >
-                  <Key className={`w-4 h-4 flex-shrink-0 mt-1 ${isActive ? "text-indigo-600" : "text-stone-400"}`} />
+                  <Key
+                    className={`w-4 h-4 flex-shrink-0 mt-1 ${
+                      isActive ? (t.light ? "text-indigo-600" : "text-sky-300") : t.faint
+                    }`}
+                  />
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium text-stone-900 font-mono truncate">{cert.commonName}</div>
-                    <div className="text-xs text-stone-500 mt-0.5 truncate font-mono">{cert.fingerprint}</div>
-                    <div className="text-xs text-stone-400 mt-0.5">
+                    <div className={`text-sm font-medium font-mono truncate ${t.title}`}>{cert.commonName}</div>
+                    <div className={`text-xs mt-0.5 truncate font-mono ${t.muted}`}>{cert.fingerprint}</div>
+                    <div className={`text-xs mt-0.5 ${t.faint}`}>
                       Expires {new Date(cert.expiresAt).toLocaleDateString()}
                       {cert.notes && ` · ${cert.notes}`}
                     </div>
-                    {isActive && cert.pkcs12Password && (
-                      <PasswordReveal password={cert.pkcs12Password} />
-                    )}
+                    {isActive && cert.pkcs12Password && <PasswordReveal password={cert.pkcs12Password} />}
                   </div>
                   <div className="flex items-center gap-1 flex-shrink-0 mt-0.5">
                     <CertStatusBadge cert={cert} />
@@ -480,10 +524,12 @@ export function LiveWifiCertView() {
                           const a = document.createElement("a");
                           a.href = url;
                           a.download = `${cert.commonName}-cert.pem`;
-                          document.body.appendChild(a); a.click();
-                          document.body.removeChild(a); URL.revokeObjectURL(url);
+                          document.body.appendChild(a);
+                          a.click();
+                          document.body.removeChild(a);
+                          URL.revokeObjectURL(url);
                         }}
-                        className="p-2 hover:bg-indigo-50 rounded-lg text-stone-400 hover:text-indigo-600 transition-colors"
+                        className={t.btnIcon}
                         title="Download certificate (.pem)"
                       >
                         <Download className="w-4 h-4" />
@@ -493,10 +539,14 @@ export function LiveWifiCertView() {
                       <button
                         onClick={() => handleRevoke(cert.id)}
                         disabled={revoking === cert.id}
-                        className="p-2 hover:bg-rose-50 rounded-lg text-stone-400 hover:text-rose-600 transition-colors disabled:opacity-50"
+                        className={`${t.btnIcon} hover:text-rose-400 disabled:opacity-50`}
                         title="Delete certificate"
                       >
-                        {revoking === cert.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                        {revoking === cert.id ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="w-4 h-4" />
+                        )}
                       </button>
                     )}
                   </div>
@@ -507,14 +557,15 @@ export function LiveWifiCertView() {
         )}
       </div>
 
-      {/* Install guide */}
       <InstallGuide />
 
-      {/* CA cert info */}
-      <div className="bg-stone-50 border border-stone-200 rounded-2xl p-5 flex items-start gap-3">
-        <AlertTriangle className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
-        <div className="text-xs text-stone-600 leading-relaxed">
-          <strong className="text-stone-900">CA certificate trust:</strong> Your device must trust the company CA to verify the network's server certificate during EAP-TLS. Download the CA PEM above and import it to your device's trusted certificate store if prompted. On managed devices this is usually pushed automatically by IT.
+      <div className={`${t.soft} p-5 flex items-start gap-3`}>
+        <AlertTriangle className="w-4 h-4 text-amber-400 mt-0.5 flex-shrink-0" />
+        <div className={`text-xs leading-relaxed ${t.body}`}>
+          <strong className={t.title}>CA certificate trust:</strong> Your device must trust the company CA to
+          verify the network's server certificate during EAP-TLS. Download the CA PEM above and import it to your
+          device's trusted certificate store if prompted. On managed devices this is usually pushed automatically
+          by IT.
         </div>
       </div>
     </div>

@@ -77,6 +77,13 @@ const PatchBody = z.object({
       maxDevicesPerUser: z.coerce.number().int().min(1).max(50).optional(),
     })
     .optional(),
+
+  wifi: z
+    .object({
+      // IEEE 802.11 SSID is 0–32 octets; allow empty string to clear.
+      defaultSsid: z.string().max(32).nullable().optional(),
+    })
+    .optional(),
 });
 
 const adminPlatformSettings: FastifyPluginAsync = async (app) => {
@@ -91,14 +98,20 @@ const adminPlatformSettings: FastifyPluginAsync = async (app) => {
     };
   }
 
-  // ── GET /admin/settings/platform ────────────────────────────────
-  app.get("/settings/platform", async () => {
-    const [tg, caInfo, certSettings, reloadCmd, nac] = await Promise.all([
+  async function getWifiSettings() {
+    const row = await prisma.platformSetting.findUnique({ where: { key: "wifi.default_ssid" } });
+    const value = row?.value?.trim() || "";
+    return { defaultSsid: value || null };
+  }
+
+  async function buildPlatformResponse() {
+    const [tg, caInfo, certSettings, reloadCmd, nac, wifi] = await Promise.all([
       getTelegramSettings(),
       getCaInfo(),
       getCertSettings(),
       getReloadCommand(),
       getNacSettings(),
+      getWifiSettings(),
     ]);
     return {
       telegram: {
@@ -113,8 +126,12 @@ const adminPlatformSettings: FastifyPluginAsync = async (app) => {
         configured:    Boolean(reloadCmd),
       },
       nac,
+      wifi,
     };
-  });
+  }
+
+  // ── GET /admin/settings/platform ────────────────────────────────
+  app.get("/settings/platform", async () => buildPlatformResponse());
 
   // ── PUT /admin/settings/platform ────────────────────────────────
   app.put<{ Body: z.infer<typeof PatchBody> }>("/settings/platform", async (req, reply) => {
@@ -194,27 +211,21 @@ const adminPlatformSettings: FastifyPluginAsync = async (app) => {
       });
     }
 
-    const [tg, caInfo, certSettings, reloadCmd, nac] = await Promise.all([
-      getTelegramSettings(),
-      getCaInfo(),
-      getCertSettings(),
-      getReloadCommand(),
-      getNacSettings(),
-    ]);
-    return reply.status(200).send({
-      telegram: {
-        botToken:    maskSecret(tg.botToken),
-        adminChatId: tg.adminChatId,
-        configured:  Boolean(tg.botToken && tg.adminChatId),
-      },
-      ca: caInfo,
-      certSettings,
-      freeradius: {
-        reloadCommand: reloadCmd,
-        configured:    Boolean(reloadCmd),
-      },
-      nac,
-    });
+    // ── Wi‑Fi portal defaults ─────────────────────────────────────
+    if (body.wifi?.defaultSsid !== undefined) {
+      const ssid = body.wifi.defaultSsid?.trim() || "";
+      if (!ssid) {
+        await prisma.platformSetting.deleteMany({ where: { key: "wifi.default_ssid" } });
+      } else {
+        await prisma.platformSetting.upsert({
+          where:  { key: "wifi.default_ssid" },
+          create: { key: "wifi.default_ssid", value: ssid },
+          update: { value: ssid },
+        });
+      }
+    }
+
+    return reply.status(200).send(await buildPlatformResponse());
   });
 };
 

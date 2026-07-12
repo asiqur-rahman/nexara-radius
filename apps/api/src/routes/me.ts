@@ -2,8 +2,9 @@
 //  Self-service core routes (/api/v1/me/...).
 //
 //  Registered here:
-//    POST /me/password  — change own password
-//    GET  /me/wifi-ca   — download the WiFi CA cert (for EAP-TLS setup)
+//    POST /me/password      — change own password
+//    GET  /me/wifi-ca       — download the WiFi CA cert (for EAP-TLS setup)
+//    GET  /me/wifi-config   — portal Wi‑Fi defaults (default SSID, etc.)
 //
 //  Related plugins (registered alongside in server.ts):
 //    meDevices.ts  — /me/devices, /me/sessions
@@ -66,6 +67,13 @@ const me: FastifyPluginAsync = async (app) => {
       .header("Content-Type", "application/x-pem-file")
       .header("Content-Disposition", 'attachment; filename="wifi-ca.pem"')
       .send(ca.certPem);
+  });
+
+  // GET /me/wifi-config — non-sensitive portal defaults (SSID, etc.)
+  app.get("/me/wifi-config", async () => {
+    const row = await prisma.platformSetting.findUnique({ where: { key: "wifi.default_ssid" } });
+    const value = row?.value?.trim() || "";
+    return { defaultSsid: value || null };
   });
 };
 

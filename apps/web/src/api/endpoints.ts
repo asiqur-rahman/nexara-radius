@@ -344,6 +344,7 @@ export function updatePlatformSettings(
     certSettings?: UpdateCertSettingsRequest;
     freeradius?: { reloadCommand?: string | null };
     nac?: { maxDevicesPerUser?: number };
+    wifi?: { defaultSsid?: string | null };
   },
 ) {
   return api<PlatformSettingsResponse>(`${v1}/admin/settings/platform`, {
@@ -351,6 +352,10 @@ export function updatePlatformSettings(
     token,
     body,
   });
+}
+
+export function getMyWifiConfig(token: string) {
+  return api<{ defaultSsid: string | null }>(`${v1}/me/wifi-config`, { token });
 }
 
 // ── FreeRADIUS management ─────────────────────────────────────────────
