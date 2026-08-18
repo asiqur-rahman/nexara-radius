@@ -1705,12 +1705,18 @@ function BackupRestorePanel({ token }: { token: string }) {
     try {
       const result = await restoreSystemBackup(token, { confirm: "RESTORE", archiveBase64 });
       setLastRestore(result);
-      setNotice({
-        ok: true,
-        text: result.reloaded
-          ? "Restore complete. FreeRADIUS was reloaded."
-          : `Restore complete.${result.reloadError ? ` Reload warning: ${result.reloadError}` : " Reload FreeRADIUS if NAS clients changed."}`,
-      });
+      const bits = ["Restore complete."];
+      if (result.preservedActor?.keptPassword) {
+        bits.push(`Signed-in user ${result.preservedActor.username} kept their current password.`);
+      }
+      if (result.platformAdmin) {
+        bits.push(`${result.platformAdmin} is platform admin.`);
+      }
+      if (result.reloaded) bits.push("FreeRADIUS was reloaded.");
+      else if (result.reloadError) bits.push(`Reload warning: ${result.reloadError}`);
+      else bits.push("Reload FreeRADIUS if NAS clients changed.");
+      if (result.historyError) bits.push(`History warning: ${result.historyError}`);
+      setNotice({ ok: !result.historyError, text: bits.join(" ") });
       setConfirm("");
     } catch (err) {
       setNotice({
@@ -1731,6 +1737,7 @@ function BackupRestorePanel({ token }: { token: string }) {
           <p className="text-xs text-zinc-500 mt-0.5">
             Download a full platform snapshot (users, secrets, devices, groups, NAS, certificates,
             settings, RADIUS tables) or restore from a previous backup. Restore is destructive.
+            Your signed-in account is kept (same password and session). User <span className="font-mono">asiq</span> stays platform admin.
           </p>
         </div>
       </div>

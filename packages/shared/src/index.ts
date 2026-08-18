@@ -116,6 +116,11 @@ export interface SystemBackupRestoreResult {
   restored: Record<string, number>;
   reloaded: boolean;
   reloadError?: string;
+  historyError?: string;
+  /** Signed-in account was matched by username and kept (password + session id). */
+  preservedActor?: { username: string; keptPassword: boolean } | null;
+  /** Username that restore forced to role=admin (always `asiq` when present). */
+  platformAdmin?: string | null;
 }
 
 export interface SystemBackupRestoreRequest {

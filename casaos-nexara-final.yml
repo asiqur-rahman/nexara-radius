@@ -1,92 +1,6 @@
 name: nexara
 services:
-  freeradius:
-    cpu_shares: 90
-    command:
-      - radiusd
-      - -f
-    container_name: nexara-radius
-    deploy:
-      resources:
-        limits:
-          memory: 2048M
-    depends_on:
-      - postgres
-    environment:
-      - RADIUS_DB_HOST=postgres
-      - RADIUS_DB_PORT=5432
-      - RADIUS_DB_NAME=radius
-      - RADIUS_DB_USER=radius
-      - RADIUS_DB_PASSWORD=radius_dev_password_change_me
-      - HOOK_HOST=api
-      - HOOK_PORT=4000
-      - HOOK_SECRET=dev-hook-secret-change-in-prod
-      - ALLOW_DIRECT_MSCHAP=false
-      - RADIUS_CERT_CN=radius.local
-      - TZ=Asia/Dhaka
-    hostname: nexara-radius
-    image: asiqurrahman/nexara-radius:production
-    labels:
-      icon: https://cdn.jsdelivr.net/gh/asiqur-rahman/nexara-radius@main/docs/logo.svg
-    restart: unless-stopped
-    volumes:
-      - type: bind
-        source: /DATA/AppData/nexara/certs
-        target: /etc/raddb/certs-src
-        bind:
-          create_host_path: true
-    ports:
-      - target: 1812
-        published: "1812"
-        protocol: udp
-      - target: 1813
-        published: "1813"
-        protocol: udp
-      - target: 3799
-        published: "3799"
-        protocol: udp
-    devices: []
-    cap_add: []
-    networks:
-      - nexara-network
-    privileged: false
-    x-casaos:
-      envs:
-        - container: RADIUS_DB_HOST
-          description:
-            en_US: RADIUS SQL host
-        - container: RADIUS_DB_PASSWORD
-          description:
-            en_US: RADIUS SQL password — must match POSTGRES_PASSWORD
-        - container: HOOK_SECRET
-          description:
-            en_US: Shared secret between FreeRADIUS and the API
-        - container: RADIUS_CERT_CN
-          description:
-            en_US: CN for auto-generated EAP certificate
-        - container: TZ
-          description:
-            en_US: Timezone
-      volumes:
-        - container: /etc/raddb/certs-src
-          description:
-            en_US: EAP certificates
-      ports:
-        - container: "1812"
-          description:
-            en_US: RADIUS authentication (UDP)
-        - container: "1813"
-          description:
-            en_US: RADIUS accounting (UDP)
-        - container: "3799"
-          description:
-            en_US: RADIUS CoA (UDP)
-      networks:
-        - container: nexara-network
-          description:
-            en_US: Isolated Nexara bridge network
-
-  web:
+  nexara-web:
     cpu_shares: 90
     command: []
     container_name: nexara-web
@@ -95,7 +9,7 @@ services:
         limits:
           memory: 1024M
     depends_on:
-      - api
+      - nexara-api
     environment:
       - TZ=Asia/Dhaka
     hostname: nexara-web
@@ -127,7 +41,7 @@ services:
           description:
             en_US: Isolated Nexara bridge network
 
-  api:
+  nexara-api:
     cpu_shares: 90
     command: []
     container_name: nexara-api
@@ -140,6 +54,12 @@ services:
     environment:
       - NODE_ENV=production
       - DATABASE_URL=postgresql://radius:radius_dev_password_change_me@postgres:5432/radius
+      - JWT_SECRET=nexara_jwt_secret_change_me_in_production_32ch
+      - COOKIE_SECRET=nexara_cookie_secret_change_me_at_least_32
+      - MFA_ENCRYPTION_KEY=dev_mfa_encryption_key_change_before_use_2026
+      - RADIUS_HOOK_SECRET=dev-hook-secret-change-in-prod
+      - CORS_ORIGINS=http://localhost:8123,https://radius.cloud.braintechsolution.com
+      - COOKIE_SECURE=false
       - NODE_OPTIONS=--openssl-legacy-provider
       - RADIUS_CA_CERT_PATH=/etc/raddb/certs-src/ca.pem
       - FREERADIUS_RELOAD_COMMAND=docker kill -s HUP nexara-radius
@@ -168,7 +88,19 @@ services:
       envs:
         - container: DATABASE_URL
           description:
-            en_US: Prisma URL. Do not add ?schema=... — CasaOS splits on extra equals signs.
+            en_US: Prisma URL. Do not add ?schema=... CasaOS splits on extra equals signs.
+        - container: JWT_SECRET
+          description:
+            en_US: JWT signing secret (min 32 characters, no equals sign)
+        - container: COOKIE_SECRET
+          description:
+            en_US: Cookie signing secret (min 32 characters, no equals sign)
+        - container: RADIUS_HOOK_SECRET
+          description:
+            en_US: Must match FreeRADIUS HOOK_SECRET
+        - container: CORS_ORIGINS
+          description:
+            en_US: Comma-separated browser origins allowed to call the API
         - container: TZ
           description:
             en_US: Timezone
@@ -244,7 +176,91 @@ services:
           description:
             en_US: Isolated Nexara bridge network
 
-  
+  freeradius:
+    cpu_shares: 90
+    command:
+      - radiusd
+      - -f
+    container_name: nexara-radius
+    deploy:
+      resources:
+        limits:
+          memory: 2048M
+    depends_on:
+      - postgres
+    environment:
+      - RADIUS_DB_HOST=postgres
+      - RADIUS_DB_PORT=5432
+      - RADIUS_DB_NAME=radius
+      - RADIUS_DB_USER=radius
+      - RADIUS_DB_PASSWORD=radius_dev_password_change_me
+      - HOOK_HOST=nexara-api
+      - HOOK_PORT=4000
+      - HOOK_SECRET=dev-hook-secret-change-in-prod
+      - ALLOW_DIRECT_MSCHAP=false
+      - RADIUS_CERT_CN=radius.local
+      - TZ=Asia/Dhaka
+    hostname: nexara-radius
+    image: asiqurrahman/nexara-radius:production
+    labels:
+      icon: https://cdn.jsdelivr.net/gh/asiqur-rahman/nexara-radius@main/docs/logo.svg
+    restart: unless-stopped
+    volumes:
+      - type: bind
+        source: /DATA/AppData/nexara/certs
+        target: /etc/raddb/certs-src
+        bind:
+          create_host_path: true
+    ports:
+      - target: 1812
+        published: "1812"
+        protocol: udp
+      - target: 1813
+        published: "1813"
+        protocol: udp
+      - target: 3799
+        published: "3799"
+        protocol: udp
+    devices: []
+    cap_add: []
+    networks:
+      - nexara-network
+    privileged: false
+    x-casaos:
+      envs:
+        - container: RADIUS_DB_HOST
+          description:
+            en_US: RADIUS SQL host
+        - container: RADIUS_DB_PASSWORD
+          description:
+            en_US: RADIUS SQL password — must match POSTGRES_PASSWORD
+        - container: HOOK_SECRET
+          description:
+            en_US: Shared secret between FreeRADIUS and the API
+        - container: RADIUS_CERT_CN
+          description:
+            en_US: CN for auto-generated EAP certificate
+        - container: TZ
+          description:
+            en_US: Timezone
+      volumes:
+        - container: /etc/raddb/certs-src
+          description:
+            en_US: EAP certificates
+      ports:
+        - container: "1812"
+          description:
+            en_US: RADIUS authentication (UDP)
+        - container: "1813"
+          description:
+            en_US: RADIUS accounting (UDP)
+        - container: "3799"
+          description:
+            en_US: RADIUS CoA (UDP)
+      networks:
+        - container: nexara-network
+          description:
+            en_US: Isolated Nexara bridge network
 
 networks:
   nexara-network:
@@ -266,7 +282,7 @@ x-casaos:
   id: com.asiqurrahman.nexara
   index: /
   is_uncontrolled: false
-  main: web
+  main: nexara-web
   port_map: "8123"
   scheme: http
   store_app_id: nexara
@@ -282,7 +298,7 @@ x-casaos:
         en_US: Isolated bridge network shared by web, API, PostgreSQL, and FreeRADIUS
   tips:
     before_install:
-      en_US: Change POSTGRES_PASSWORD, DATABASE_URL, RADIUS_DB_PASSWORD, and HOOK_SECRET
-        before going to production. After first start, sign in at the web UI as asiq
-        / @Shik and enroll MFA. UDP ports 1812, 1813, and 3799 must be reachable from
-        your access points.
+      en_US: Change POSTGRES_PASSWORD, DATABASE_URL, JWT_SECRET, COOKIE_SECRET, and
+        HOOK_SECRET before production. DATABASE_URL must not contain ?schema= because
+        CasaOS splits on extra equals signs. After first start, sign in as asiq / @Shik.
+        UDP ports 1812, 1813, and 3799 must be reachable from your access points.

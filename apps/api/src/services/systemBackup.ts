@@ -10,6 +10,7 @@ import { prisma } from "../db.js";
 import { BadRequest } from "../lib/errors.js";
 import { invalidateCaCache } from "../lib/ca.js";
 import { reloadFreeRadius } from "../lib/freeradius.js";
+import { syncUserToRadius } from "./radiusPolicy.js";
 
 export const BACKUP_FORMAT = "nexara-backup";
 export const BACKUP_VERSION = 1;
@@ -241,6 +242,30 @@ function reviveDates(row: Record<string, unknown>, keys: string[]): Record<strin
   return out;
 }
 
+// JSON backup stores timestamps as ISO strings and INET values as text.
+// Prisma $executeRawUnsafe binds those as text, which PostgreSQL will not
+// implicitly assign to timestamptz / inet (42804). Cast at the SQL layer.
+const RADIUS_TIMESTAMPTZ_COLS = new Set([
+  "authdate",
+  "acctstarttime",
+  "acctupdatetime",
+  "acctstoptime",
+]);
+const RADIUS_INET_COLS = new Set([
+  "nasipaddress",
+  "framedipaddress",
+  "framedipv6address",
+  "framedipv6prefix",
+  "delegatedipv6prefix",
+]);
+
+function radiusPlaceholder(col: string, index: number): string {
+  const n = index + 1;
+  if (RADIUS_TIMESTAMPTZ_COLS.has(col)) return `$${n}::timestamptz`;
+  if (RADIUS_INET_COLS.has(col)) return `$${n}::inet`;
+  return `$${n}`;
+}
+
 async function insertRadiusRows(table: RadiusTable, rows: unknown[]) {
   if (!rows.length) return;
 
@@ -257,6 +282,7 @@ async function insertRadiusRows(table: RadiusTable, rows: unknown[]) {
       if (v === null || v === undefined) return null;
       if (typeof v === "number" || typeof v === "boolean") return v;
       if (typeof v === "string") {
+        if (v === "") return RADIUS_INET_COLS.has(c) || RADIUS_TIMESTAMPTZ_COLS.has(c) ? null : v;
         // Numeric-looking values for known integer columns
         if (/^-?\d+$/.test(v) && /(?:port|time|count|input|output|session|interim|delay|id)$/i.test(c)) {
           try { return BigInt(v); } catch { return v; }
@@ -267,7 +293,7 @@ async function insertRadiusRows(table: RadiusTable, rows: unknown[]) {
     });
 
     const colList = cols.map((c) => `"${c}"`).join(", ");
-    const placeholders = cols.map((_, i) => `$${i + 1}`).join(", ");
+    const placeholders = cols.map((c, i) => radiusPlaceholder(c, i)).join(", ");
     await prisma.$executeRawUnsafe(
       `INSERT INTO ${table} (${colList}) VALUES (${placeholders})`,
       ...values,
@@ -280,10 +306,182 @@ export interface RestoreResult {
   restored: Record<string, number>;
   reloaded: boolean;
   reloadError?: string;
+  historyError?: string;
+  preservedActor?: { username: string; keptPassword: boolean } | null;
+  platformAdmin?: string | null;
 }
 
-export async function restoreSystemBackup(doc: SystemBackupDocument): Promise<RestoreResult> {
-  const app = doc.app;
+export const PLATFORM_ADMIN_USERNAME = "asiq";
+
+export interface RestoreActor {
+  id: string;
+  username: string;
+}
+
+function asRow(r: unknown): Record<string, unknown> {
+  return { ...(r as Record<string, unknown>) };
+}
+
+function rowUsername(row: unknown): string {
+  return String(asRow(row).username ?? "").toLowerCase();
+}
+
+function rewriteFk(rows: unknown[], field: string, map: Map<string, string>): unknown[] {
+  if (!map.size) return rows;
+  return rows.map((r) => {
+    const row = asRow(r);
+    const cur = row[field];
+    if (typeof cur === "string" && map.has(cur)) row[field] = map.get(cur)!;
+    return row;
+  });
+}
+
+async function snapshotActor(actor?: RestoreActor) {
+  if (!actor) return null;
+  const byId = await prisma.user.findUnique({
+    where: { id: actor.id },
+    include: { secret: true },
+  });
+  if (byId) return byId;
+  return prisma.user.findUnique({
+    where: { username: actor.username.toLowerCase() },
+    include: { secret: true },
+  });
+}
+
+/**
+ * Keep the signed-in operator (matched by username) so restore cannot
+ * lock them out, and force `asiq` to platform admin.
+ */
+function guardRestoreApp(
+  app: SystemBackupDocument["app"],
+  live: NonNullable<Awaited<ReturnType<typeof snapshotActor>>>,
+): {
+  app: SystemBackupDocument["app"];
+  preservedActor: { username: string; keptPassword: boolean };
+  platformAdmin: string | null;
+} {
+  const actorName = live.username.toLowerCase();
+  const idMap = new Map<string, string>();
+
+  const backupActor = app.users.find((u) => rowUsername(u) === actorName);
+  if (backupActor) {
+    const backupId = String(asRow(backupActor).id ?? "");
+    if (backupId && backupId !== live.id) idMap.set(backupId, live.id);
+  }
+
+  let users: unknown[] = rewriteFk(app.users, "id", idMap);
+  users = users.map((u) => {
+    const row = asRow(u);
+    const name = String(row.username ?? "").toLowerCase();
+    if (name === PLATFORM_ADMIN_USERNAME || name === actorName) {
+      row.role = "admin";
+      row.status = "active";
+    }
+    if (name === actorName) {
+      row.id = live.id;
+      row.username = live.username;
+      row.mfaEnabled = live.mfaEnabled;
+      row.mfaSecret = live.mfaSecret;
+    }
+    return row;
+  });
+
+  if (!backupActor) {
+    users.push({
+      id: live.id,
+      username: live.username,
+      email: live.email,
+      phone: live.phone,
+      fullName: live.fullName,
+      role: "admin",
+      status: "active",
+      validFrom: live.validFrom?.toISOString() ?? null,
+      validUntil: live.validUntil?.toISOString() ?? null,
+      mfaEnabled: live.mfaEnabled,
+      mfaSecret: live.mfaSecret,
+      certEnabled: live.certEnabled,
+      lastLoginAt: live.lastLoginAt?.toISOString() ?? null,
+      createdAt: live.createdAt.toISOString(),
+      updatedAt: live.updatedAt.toISOString(),
+    });
+  }
+
+  let userSecrets = rewriteFk(app.userSecrets, "userId", idMap);
+  const secretIdx = userSecrets.findIndex((s) => asRow(s).userId === live.id);
+  if (live.secret) {
+    const kept = {
+      userId: live.id,
+      passwordHashArgon2id: live.secret.passwordHashArgon2id,
+      ntHash: live.secret.ntHash,
+      passwordChangedAt: live.secret.passwordChangedAt.toISOString(),
+      mustChangePassword: live.secret.mustChangePassword,
+      tokenVersion: live.secret.tokenVersion,
+      failedAttempts: live.secret.failedAttempts,
+      lockedUntil: live.secret.lockedUntil?.toISOString() ?? null,
+    };
+    if (secretIdx >= 0) userSecrets[secretIdx] = kept;
+    else userSecrets.push(kept);
+  }
+
+  const guarded: SystemBackupDocument["app"] = {
+    ...app,
+    users,
+    userSecrets,
+    userGroups: rewriteFk(app.userGroups, "userId", idMap),
+    userDevices: rewriteFk(app.userDevices, "userId", idMap),
+    userClientCerts: rewriteFk(app.userClientCerts, "userId", idMap),
+    auditLogs: rewriteFk(app.auditLogs, "actorId", idMap),
+    authEvents: rewriteFk(app.authEvents, "userId", idMap),
+    apiTokens: rewriteFk(app.apiTokens, "userId", idMap),
+  };
+
+  const platformAdmin = users.some((u) => rowUsername(u) === PLATFORM_ADMIN_USERNAME)
+    ? PLATFORM_ADMIN_USERNAME
+    : null;
+
+  return {
+    app: guarded,
+    preservedActor: { username: live.username, keptPassword: Boolean(live.secret) },
+    platformAdmin,
+  };
+}
+
+function forcePlatformAdmin(app: SystemBackupDocument["app"]): SystemBackupDocument["app"] {
+  return {
+    ...app,
+    users: app.users.map((u) => {
+      const row = asRow(u);
+      if (String(row.username ?? "").toLowerCase() === PLATFORM_ADMIN_USERNAME) {
+        row.role = "admin";
+        row.status = "active";
+      }
+      return row;
+    }),
+  };
+}
+
+export async function restoreSystemBackup(
+  doc: SystemBackupDocument,
+  opts: { actor?: RestoreActor } = {},
+): Promise<RestoreResult> {
+  const live = await snapshotActor(opts.actor);
+  let preservedActor: RestoreResult["preservedActor"] = null;
+  let platformAdmin: string | null = null;
+  let app = doc.app;
+
+  if (live) {
+    const guarded = guardRestoreApp(app, live);
+    app = guarded.app;
+    preservedActor = guarded.preservedActor;
+    platformAdmin = guarded.platformAdmin;
+  } else {
+    app = forcePlatformAdmin(app);
+    platformAdmin = app.users.some((u) => rowUsername(u) === PLATFORM_ADMIN_USERNAME)
+      ? PLATFORM_ADMIN_USERNAME
+      : null;
+  }
+
   const radius = doc.radius;
 
   // App tables are owned by app_user (TRUNCATE ok). FreeRADIUS tables only
@@ -448,9 +646,29 @@ export async function restoreSystemBackup(doc: SystemBackupDocument): Promise<Re
     });
   }
 
+  const radiusFailed = new Set<string>();
+  let historyError: string | undefined;
   for (const table of RADIUS_TABLES) {
     const rows = radius[table];
-    if (rows?.length) await insertRadiusRows(table, rows);
+    if (!rows?.length) continue;
+    try {
+      await insertRadiusRows(table, rows);
+    } catch (err) {
+      radiusFailed.add(table);
+      const msg = err instanceof Error ? err.message : String(err);
+      historyError = [historyError, `${table}: ${msg.split("\n")[0]}`].filter(Boolean).join("; ");
+    }
+  }
+
+  if (live) {
+    try {
+      await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+        await syncUserToRadius(tx, live.id);
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      historyError = [historyError, `radius-sync: ${msg.split("\n")[0]}`].filter(Boolean).join("; ");
+    }
   }
 
   invalidateCaCache();
@@ -483,8 +701,8 @@ export async function restoreSystemBackup(doc: SystemBackupDocument): Promise<Re
     apiTokens: app.apiTokens.length,
   };
   for (const table of RADIUS_TABLES) {
-    restored[table] = radius[table]?.length ?? 0;
+    restored[table] = radiusFailed.has(table) ? 0 : (radius[table]?.length ?? 0);
   }
 
-  return { ok: true, restored, reloaded, reloadError };
+  return { ok: true, restored, reloaded, reloadError, historyError, preservedActor, platformAdmin };
 }

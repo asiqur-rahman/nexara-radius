@@ -72,22 +72,34 @@ const adminBackup: FastifyPluginAsync = async (app) => {
         throw BadRequest(err instanceof Error ? err.message : "Invalid backup archive");
       }
 
-      const result = await restoreSystemBackup(doc);
-
-      await audit({
-        actorId: req.currentUser!.sub,
-        action: "user_update",
-        targetType: "system",
-        targetId: "restore",
-        metadata: {
-          event: "system.restore",
-          restored: result.restored,
-          reloaded: result.reloaded,
-          reloadError: result.reloadError ?? null,
-          backupExportedAt: doc.exportedAt,
+      const result = await restoreSystemBackup(doc, {
+        actor: {
+          id: req.currentUser!.sub,
+          username: req.currentUser!.username,
         },
-        req,
       });
+
+      try {
+        await audit({
+          actorId: req.currentUser!.sub,
+          action: "user_update",
+          targetType: "system",
+          targetId: "restore",
+          metadata: {
+            event: "system.restore",
+            restored: result.restored,
+            reloaded: result.reloaded,
+            reloadError: result.reloadError ?? null,
+            historyError: result.historyError ?? null,
+            backupExportedAt: doc.exportedAt,
+            preservedActor: result.preservedActor ?? null,
+            platformAdmin: result.platformAdmin ?? null,
+          },
+          req,
+        });
+      } catch (err) {
+        req.log.warn({ err }, "restore audit failed");
+      }
 
       return result;
     },

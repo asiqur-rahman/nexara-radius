@@ -35,13 +35,21 @@ const plugin: FastifyPluginAsync = async (app) => {
       if (err.code === "P2025") {
         return reply.status(404).send({ error: "not_found", message: "Record not found" });
       }
+      const pg = typeof err.meta?.message === "string" ? err.meta.message : err.message;
+      return reply.status(400).send({
+        error: "bad_request",
+        message: pg.replace(/^ERROR:\s*/i, "").split("\n")[0] ?? pg,
+      });
     }
 
-    // Fastify validation
-    if (err && typeof err === "object" && "validation" in err && err.validation) {
-      return reply.status(400).send({
-        error: "validation_failed",
-        message: err instanceof Error ? err.message : "Validation failed",
+    // Fastify validation / parse errors (e.g. invalid JSON body)
+    const status = typeof err === "object" && err && "statusCode" in err
+      ? Number((err as { statusCode?: number }).statusCode)
+      : undefined;
+    if (status && status >= 400 && status < 500) {
+      return reply.status(status).send({
+        error: "bad_request",
+        message: err instanceof Error ? err.message : "Bad request",
       });
     }
 
