@@ -13,7 +13,7 @@ services:
     environment:
       - TZ=Asia/Dhaka
     hostname: nexara-web
-    image: asiqurrahman/nexara-web:production
+    image: asiqurrahman/nexara-web:latest
     labels:
       icon: https://cdn.jsdelivr.net/gh/asiqur-rahman/nexara-radius@main/docs/logo.svg
     restart: unless-stopped
@@ -65,7 +65,7 @@ services:
       - FREERADIUS_RELOAD_COMMAND=docker kill -s HUP nexara-radius
       - TZ=Asia/Dhaka
     hostname: nexara-api
-    image: asiqurrahman/nexara-api:production
+    image: asiqurrahman/nexara-api:latest
     labels:
       icon: https://cdn.jsdelivr.net/gh/asiqur-rahman/nexara-radius@main/docs/logo.svg
     restart: unless-stopped
@@ -201,7 +201,7 @@ services:
       - RADIUS_CERT_CN=radius.local
       - TZ=Asia/Dhaka
     hostname: nexara-radius
-    image: asiqurrahman/nexara-radius:production
+    image: asiqurrahman/nexara-radius:latest
     labels:
       icon: https://cdn.jsdelivr.net/gh/asiqur-rahman/nexara-radius@main/docs/logo.svg
     restart: unless-stopped
