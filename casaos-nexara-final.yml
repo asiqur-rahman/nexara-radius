@@ -85,7 +85,7 @@ services:
         - container: nexara-network
           description:
             en_US: Isolated Nexara bridge network
-            
+
   web:
     cpu_shares: 90
     command: []
@@ -137,10 +137,9 @@ services:
           memory: 4096M
     depends_on:
       - postgres
-      - freeradius
     environment:
       - NODE_ENV=production
-      - DATABASE_URL=postgresql://radius:radius_dev_password_change_me@postgres:5432/radius?schema=public
+      - DATABASE_URL=postgresql://radius:radius_dev_password_change_me@postgres:5432/radius
       - NODE_OPTIONS=--openssl-legacy-provider
       - RADIUS_CA_CERT_PATH=/etc/raddb/certs-src/ca.pem
       - FREERADIUS_RELOAD_COMMAND=docker kill -s HUP nexara-radius
@@ -169,7 +168,7 @@ services:
       envs:
         - container: DATABASE_URL
           description:
-            en_US: Prisma connection string — password must match POSTGRES_PASSWORD
+            en_US: Prisma URL. Do not add ?schema=... — CasaOS splits on extra equals signs.
         - container: TZ
           description:
             en_US: Timezone
@@ -215,6 +214,13 @@ services:
     networks:
       - nexara-network
     privileged: false
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U radius -d radius
+      interval: 5s
+      timeout: 5s
+      retries: 20
     x-casaos:
       envs:
         - container: POSTGRES_USER

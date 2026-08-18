@@ -9,10 +9,19 @@
 # ─────────────────────────────────────────────────────────────────────────────
 set -e
 
-echo "[entrypoint] Ensuring migration tracking table exists..."
-node node_modules/prisma/build/index.js db execute \
-  --file ./prisma/ensure-migrations-table.sql
-echo "[entrypoint] Running database migrations..."
+echo "[entrypoint] Waiting for PostgreSQL..."
+i=0
+until node node_modules/prisma/build/index.js db execute \
+  --file ./prisma/ensure-migrations-table.sql; do
+  i=$((i + 1))
+  if [ "$i" -ge 30 ]; then
+    echo "[entrypoint] Database did not become ready in time."
+    exit 1
+  fi
+  echo "[entrypoint] Database not ready (attempt $i/30), retrying in 2s..."
+  sleep 2
+done
+echo "[entrypoint] Database is ready. Running migrations..."
 node node_modules/prisma/build/index.js migrate deploy
 echo "[entrypoint] Migrations done."
 
