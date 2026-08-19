@@ -9,7 +9,7 @@
 
 # ── Configuration ─────────────────────────────────────────────────────────────
 DOCKER_USER  ?= asiqurrahman
-TAG          ?= 1.0.0
+TAG          ?= 1.0.1
 GIT_SHA      := $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
 
 API_IMAGE    := $(DOCKER_USER)/nexara-api

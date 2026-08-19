@@ -103,5 +103,20 @@ chown -R freerad:freerad "$DEST_DIR"
 find "$DEST_DIR" -name "*.key" -exec chmod 600 {} \;
 find "$DEST_DIR" -name "*.pem" -exec chmod 640 {} \;
 
+# ── 2b. Wait for Postgres so rlm_sql can load the `nas` table ───────────────
+DB_HOST="${RADIUS_DB_HOST:-postgres}"
+DB_PORT="${RADIUS_DB_PORT:-5432}"
+echo "[entrypoint] Waiting for PostgreSQL at $DB_HOST:$DB_PORT..."
+i=0
+while [ "$i" -lt 45 ]; do
+  if command -v bash >/dev/null 2>&1 && bash -c "echo >/dev/tcp/$DB_HOST/$DB_PORT" 2>/dev/null; then
+    echo "[entrypoint] PostgreSQL is reachable."
+    break
+  fi
+  i=$((i + 1))
+  sleep 2
+done
+sleep 2
+
 # ── 3. Hand off to the upstream FreeRADIUS entrypoint ────────────────────────
 exec /docker-entrypoint.sh "$@"

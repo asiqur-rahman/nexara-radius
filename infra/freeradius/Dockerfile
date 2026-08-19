@@ -35,4 +35,4 @@ EXPOSE 1812/udp 1813/udp 3799/udp
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 # docker-compose overrides CMD to "radiusd -f" for production.
 # Change to ["radiusd", "-X"] temporarily for full debug output.
-CMD ["radiusd", "-f"]
+CMD ["radiusd"]

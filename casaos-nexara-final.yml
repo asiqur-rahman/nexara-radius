@@ -13,7 +13,7 @@ services:
     environment:
       - TZ=Asia/Dhaka
     hostname: nexara-web
-    image: asiqurrahman/nexara-web:1.0.0
+    image: asiqurrahman/nexara-web:1.0.1
     labels:
       icon: https://cdn.jsdelivr.net/gh/asiqur-rahman/nexara-radius@main/docs/logo.svg
     restart: unless-stopped
@@ -65,7 +65,7 @@ services:
       - FREERADIUS_RELOAD_COMMAND=docker kill -s HUP nexara-radius
       - TZ=Asia/Dhaka
     hostname: nexara-api
-    image: asiqurrahman/nexara-api:1.0.0
+    image: asiqurrahman/nexara-api:1.0.1
     labels:
       icon: https://cdn.jsdelivr.net/gh/asiqur-rahman/nexara-radius@main/docs/logo.svg
     restart: unless-stopped
@@ -180,7 +180,6 @@ services:
     cpu_shares: 90
     command:
       - radiusd
-      - -f
     container_name: nexara-radius
     deploy:
       resources:
@@ -201,7 +200,7 @@ services:
       - RADIUS_CERT_CN=radius.local
       - TZ=Asia/Dhaka
     hostname: nexara-radius
-    image: asiqurrahman/nexara-radius:1.0.0
+    image: asiqurrahman/nexara-radius:1.0.1
     labels:
       icon: https://cdn.jsdelivr.net/gh/asiqur-rahman/nexara-radius@main/docs/logo.svg
     restart: unless-stopped
@@ -226,6 +225,14 @@ services:
     networks:
       - nexara-network
     privileged: false
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pidof freeradius >/dev/null || exit 1
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 45s
     x-casaos:
       envs:
         - container: RADIUS_DB_HOST
@@ -298,7 +305,8 @@ x-casaos:
         en_US: Isolated bridge network shared by web, API, PostgreSQL, and FreeRADIUS
   tips:
     before_install:
-      en_US: Change POSTGRES_PASSWORD, DATABASE_URL, JWT_SECRET, COOKIE_SECRET, and
-        HOOK_SECRET before production. DATABASE_URL must not contain ?schema= because
-        CasaOS splits on extra equals signs. After first start, sign in as asiq / @Shik.
-        UDP ports 1812, 1813, and 3799 must be reachable from your access points.
+      en_US: Import this file as Nexara 1.0.1. If you already ran an older YAML,
+        delete the app AND /DATA/AppData/nexara/postgres before importing, or the
+        old database is reused and seed/NAS will not run. After start, sign in as
+        asiq / @Shik. Open UDP 1812, 1813, and 3799 on the VPS firewall (TCP 8123
+        is not enough). AP shared secret is testing123 until you change it in Admin → NAS.
