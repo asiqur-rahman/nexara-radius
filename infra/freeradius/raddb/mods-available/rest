@@ -25,8 +25,8 @@ rest {
 
     # ── post-auth ────────────────────────────────────────────────────
     #  Called after successful MSCHAPv2 authentication.
-    #  The hook registers the device on first connect and fires the
-    #  Telegram approval notification to the admin.
+    #  The hook registers the MAC (if new) and returns reply:Class when
+    #  the device is not approved — inner-tunnel then converts Accept→Reject.
     post-auth {
         uri    = "http://$ENV{HOOK_HOST}:$ENV{HOOK_PORT}/api/v1/radius/post-auth?s=$ENV{HOOK_SECRET}"
         method = 'post'

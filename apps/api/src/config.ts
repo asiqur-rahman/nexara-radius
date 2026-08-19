@@ -67,15 +67,15 @@ const schema = z.object({
   DEVICE_CERT_SUBJECT_STATE: z.string().transform(v => v.trim() || undefined).optional(),
   DEVICE_CERT_SUBJECT_LOCALITY: z.string().transform(v => v.trim() || undefined).optional(),
 
-  // When true (default), non-approved devices are rejected at RADIUS authorize
-  // time rather than being quarantined on a separate VLAN.
+  // When true (default), non-approved devices are rejected in RADIUS
+  // post-auth — after the password has already been verified.
   // Set to false only if your network infrastructure properly isolates
   // the quarantine VLAN and you want a captive-portal style onboarding.
   DEVICE_APPROVAL_REQUIRED: envBoolean.default(true),
 
   // ── FreeRADIUS rlm_rest hook ─────────────────────────────────────
   // Shared secret checked on every /radius/* request (X-Radius-Hook-Secret).
-  RADIUS_HOOK_SECRET: z.string().min(16).default("dev-hook-secret-change-in-prod"),
+  RADIUS_HOOK_SECRET: z.string().min(8).default("dev-hook-secret-change-in-prod"),
 
   // When true the /radius/* preHandler also enforces the IP allowlist
   // stored in radius_allowed_ips (admin Settings → RADIUS IP Guard).

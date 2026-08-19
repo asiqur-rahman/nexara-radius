@@ -9,7 +9,7 @@
 
 # ── Configuration ─────────────────────────────────────────────────────────────
 DOCKER_USER  ?= asiqurrahman
-TAG          ?= production
+TAG          ?= 1.0.0
 GIT_SHA      := $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
 
 API_IMAGE    := $(DOCKER_USER)/nexara-api
@@ -103,27 +103,21 @@ up-app:
 build:
 	docker build -f apps/api/Dockerfile \
 		-t $(API_IMAGE):$(TAG) \
-		-t $(API_IMAGE):latest \
-		-t $(API_IMAGE):$(GIT_SHA) \
 		.
 	docker build -f apps/web/Dockerfile \
 		-t $(WEB_IMAGE):$(TAG) \
-		-t $(WEB_IMAGE):latest \
-		-t $(WEB_IMAGE):$(GIT_SHA) \
 		.
 	docker build -f infra/freeradius/Dockerfile \
 		-t $(RADIUS_IMAGE):$(TAG) \
-		-t $(RADIUS_IMAGE):latest \
-		-t $(RADIUS_IMAGE):$(GIT_SHA) \
 		infra/freeradius
 
 # ── Clean ─────────────────────────────────────────────────────────────────────
 clean:
 	$(COMPOSE) down -v --remove-orphans
 	-docker image rm -f \
-		$(API_IMAGE):$(TAG) $(API_IMAGE):latest $(API_IMAGE):$(GIT_SHA) \
-		$(WEB_IMAGE):$(TAG) $(WEB_IMAGE):latest $(WEB_IMAGE):$(GIT_SHA) \
-		$(RADIUS_IMAGE):$(TAG) $(RADIUS_IMAGE):latest $(RADIUS_IMAGE):$(GIT_SHA)
+		$(API_IMAGE):$(TAG) \
+		$(WEB_IMAGE):$(TAG) \
+		$(RADIUS_IMAGE):$(TAG)
 	-docker image prune -f
 
 # ── Push (interactive version picker) ─────────────────────────────────────────

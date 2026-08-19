@@ -35,6 +35,21 @@ sql {
     # Default queries shipped with the FreeRADIUS package.
     $INCLUDE ${modconfdir}/${.:name}/main/${dialect}/queries.conf
 
+    # Include MAC + reject Class so Access-Reject Log can distinguish
+    # wrong-password from unregistered-device (default query stores neither).
+    postauth_query = "\
+        INSERT INTO ${postauth_table} \
+            (username, pass, reply, authdate, callingstationid, calledstationid, class) \
+        VALUES ( \
+            '%{SQL-User-Name}', \
+            '', \
+            '%{reply:Packet-Type}', \
+            NOW(), \
+            NULLIF('%{%{Calling-Station-Id}:-%{outer.request:Calling-Station-Id}}', ''), \
+            NULLIF('%{%{Called-Station-Id}:-%{outer.request:Called-Station-Id}}', ''), \
+            NULLIF('%{%{reply:Class}:-%{Class}}', '') \
+        )"
+
     pool {
         start        = 2
         min          = 2

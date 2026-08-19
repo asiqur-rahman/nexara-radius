@@ -10,6 +10,7 @@ import { PageHelp } from "../components/PageHelp";
 
 // Reason → colour
 function reasonBadge(reason: string) {
+  if (reason.includes("Wrong password")) return "border-rose-500/20 bg-rose-500/10 text-rose-200";
   if (reason.includes("blocked"))  return "border-slate-500/20 bg-slate-500/10  text-slate-300";
   if (reason.includes("rejected")) return "border-rose-500/20  bg-rose-500/10   text-rose-200";
   if (reason.includes("pending"))  return "border-amber-500/20 bg-amber-500/10  text-amber-200";
@@ -90,11 +91,11 @@ export function LiveRejectLogView() {
               title="Access-Reject Log"
               description="Every failed RADIUS authentication attempt logged by FreeRADIUS. Shows who tried to connect, from which device, and why they were rejected. Passwords are never stored or shown."
               tips={[
+                "Wrong password — username exists but MSCHAPv2/PEAP password did not match",
                 "Unknown username — no account exists with that name",
-                "Unregistered device — user exists but this MAC was never seen before",
-                "Device pending — MAC was seen before but admin hasn't approved it yet",
+                "Unregistered device — password was correct; this MAC is new and needs approval",
+                "Device pending — password was correct; admin has not approved this MAC yet",
                 "Device rejected/blocked — admin explicitly denied this device",
-                "Authentication failed — wrong password or invalid certificate",
               ]}
             />
           </div>

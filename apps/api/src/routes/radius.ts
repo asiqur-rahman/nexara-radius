@@ -22,7 +22,7 @@ import {
 } from "../lib/clientCertificates.js";
 import { emitPlatformEvent } from "../lib/events.js";
 import { isIpAllowed } from "../lib/ipGuard.js";
-import { normalizeMac } from "../lib/mac.js";
+import { tryNormalizeMac } from "../lib/mac.js";
 import { sendApprovalRequest } from "../lib/telegram.js";
 import { lookupManufacturer, classifyDeviceType } from "../lib/oui.js";
 
@@ -105,6 +105,14 @@ function replyFromGroups(groups: UserGroupReplyShape[]): FlatRlmResponse {
   return out;
 }
 
+function rejectWithClass(reply: FastifyReply, code: string, message: string) {
+  // HTTP 200 so rlm_rest applies reply:Class; inner-tunnel then `reject`s.
+  return reply.status(200).send({
+    "reply:Class": code,
+    "reply:Reply-Message": message,
+  });
+}
+
 function replyForDevice(
   groups: UserGroupReplyShape[],
   status: "pending" | "approved" | "rejected" | "new",
@@ -151,7 +159,6 @@ async function authorizePeap(
   reply: FastifyReply,
   body: AuthorizeBody,
 ) {
-  const c = config();
   const username = body.username?.toLowerCase();
   if (!username) {
     return reply.status(400).send({ error: "Username is required for PEAP" });
@@ -189,100 +196,14 @@ async function authorizePeap(
     return reply.status(500).send({ error: "No NT-Password configured" });
   }
 
-  const normalizedMac = normalizeMac(body.mac);
-  const device = await prisma.userDevice.findFirst({
-    where: { userId: user.id, mac: normalizedMac },
-    select: { id: true, status: true },
-  });
+  // Password is verified by FreeRADIUS MSCHAPv2 *after* this hook returns
+  // NT-Password. Device approval is enforced in /post-auth so a wrong
+  // password is logged as wrong-password, not as an unregistered device.
+  const normalizedMac = tryNormalizeMac(body.mac);
+  const replyAttrs = replyFromGroups(user.groups);
 
-  const isNew = !device;
-  const status = device?.status ?? "new";
+  req.log.info({ username, mac: normalizedMac }, "radius.authorize peap");
 
-  // ── Blocked devices: silent permanent reject, never re-register ──────────
-  if (status === "blocked") {
-    req.log.info({ username, mac: normalizedMac }, "radius.authorize device_blocked");
-    return reply.status(403).send({ error: "Access denied" });
-  }
-
-  if (c.DEVICE_APPROVAL_REQUIRED && status !== "approved") {
-    const manufacturer = lookupManufacturer(normalizedMac);
-    const deviceType   = classifyDeviceType(manufacturer);
-
-    if (isNew) {
-      // Register the device as pending so the admin can see and approve it.
-      const pending = await prisma.userDevice.upsert({
-        where:  { userId_mac: { userId: user.id, mac: normalizedMac } },
-        create: {
-          userId: user.id, mac: normalizedMac, status: "pending",
-          lastSeenAt: new Date(), manufacturer, deviceType,
-        },
-        update: { lastSeenAt: new Date(), manufacturer, deviceType },
-      });
-      createPendingApproval(pending.id, {
-        username: user.username,
-        fullName: user.fullName,
-        mac:      normalizedMac,
-        nasIp:    body.nasIp,
-      }).catch((err) => {
-        req.log.error({ err, deviceId: pending.id }, "radius.peap.pending_notify failed");
-      });
-      emitPlatformEvent("device.pending", {
-        deviceId: pending.id,
-        username: user.username,
-        fullName: user.fullName,
-        mac:      normalizedMac,
-        nasIp:    body.nasIp,
-        isNew:    true,
-      });
-      req.log.info({ username, mac: normalizedMac, deviceId: pending.id }, "radius.authorize new_device_registered");
-    } else if (status === "rejected") {
-      // Rejected devices can re-apply — reset to pending and notify admin.
-      await prisma.userDevice.update({
-        where: { id: device!.id },
-        data:  { status: "pending", lastSeenAt: new Date(), manufacturer, deviceType,
-                 telegramChatId: null, telegramMessageId: null },
-      });
-      createPendingApproval(device!.id, {
-        username: user.username,
-        fullName: user.fullName,
-        mac:      normalizedMac,
-        nasIp:    body.nasIp,
-      }).catch((err) => {
-        req.log.error({ err, deviceId: device!.id }, "radius.peap.re_apply_notify failed");
-      });
-      emitPlatformEvent("device.pending", {
-        deviceId: device!.id,
-        username: user.username,
-        fullName: user.fullName,
-        mac:      normalizedMac,
-        nasIp:    body.nasIp,
-        isNew:    false,
-      });
-      req.log.info({ username, mac: normalizedMac }, "radius.authorize rejected_device_reapplied");
-    } else {
-      // Still pending
-      await prisma.userDevice.update({
-        where: { id: device!.id },
-        data:  { lastSeenAt: new Date() },
-      });
-      req.log.info({ username, mac: normalizedMac, deviceStatus: status }, "radius.authorize device_pending");
-    }
-    return reply.status(403).send({ error: "Device pending approval" });
-  }
-
-  const replyAttrs = replyForDevice(user.groups, status);
-
-  req.log.info({ username, mac: normalizedMac, deviceStatus: status }, "radius.authorize peap");
-
-  // Flat rlm_rest 3.2.x response — "control:X" keys → control list,
-  // "reply:X" keys → reply list.  Plain string values, operator defaults to :=
-  //
-  // NOTE: Do NOT set control:Auth-Type here.  Inside the PEAP inner tunnel,
-  // EAP-MSCHAPv2 is wrapped in EAP-Message and handled by the `eap` module
-  // (which delegates to its eap_mschapv2 sub-module).  Setting Auth-Type :=
-  // MS-CHAP causes FreeRADIUS to invoke the raw mschap module directly, which
-  // then errors "No MS-CHAP attributes in request" because the challenge/
-  // response are EAP-wrapped, not bare MS-CHAP-Challenge / MS-CHAP2-Response.
   const response: FlatRlmResponse = {
     "control:NT-Password": `0x${ntHash}`,
     ...replyAttrs,
@@ -296,8 +217,7 @@ async function authorizeEapTls(
   reply: FastifyReply,
   body: AuthorizeBody,
 ) {
-  const c = config();
-  const normalizedMac = normalizeMac(body.mac);
+  const normalizedMac = tryNormalizeMac(body.mac) ?? "";
   let certificate: ClientCertificateSummary;
 
   try {
@@ -514,24 +434,44 @@ const radiusRoutes: FastifyPluginAsync = async (app) => {
       nasIp: string;
     };
   }>("/post-auth", async (req, reply) => {
-    const { username, mac, nasIp } = req.body;
-    const normalizedMac = normalizeMac(mac);
+    const c = config();
+    const username = req.body.username?.toLowerCase();
+    const { nasIp } = req.body;
+    const normalizedMac = tryNormalizeMac(req.body.mac);
+
+    if (!username) {
+      return rejectWithClass(reply, "unknown-username", "Unknown username");
+    }
 
     const user = await prisma.user.findUnique({
       where: { username },
       select: { id: true, username: true, fullName: true },
     });
-    if (!user) return reply.status(200).send({ ok: false });
+    if (!user) {
+      return rejectWithClass(reply, "unknown-username", "Unknown username");
+    }
+
+    // Password already matched. Device policy runs only now.
+    if (!normalizedMac) {
+      if (c.DEVICE_APPROVAL_REQUIRED) {
+        req.log.info({ username }, "radius.post-auth missing_mac");
+        return rejectWithClass(reply, "unregistered-device", "Unregistered device");
+      }
+      return reply.status(200).send({ ok: true });
+    }
 
     const existing = await prisma.userDevice.findFirst({
       where: { userId: user.id, mac: normalizedMac },
     });
-    const isNew = !existing;
+
+    if (existing?.status === "blocked") {
+      req.log.info({ username, mac: normalizedMac }, "radius.post-auth device_blocked");
+      return rejectWithClass(reply, "device-blocked", "Device permanently blocked");
+    }
 
     const manufacturer = lookupManufacturer(normalizedMac);
     const deviceType   = classifyDeviceType(manufacturer);
 
-    // Fetch last known IP from radacct
     const ipRow = await prisma.$queryRaw<Array<{ ip: string }>>`
       SELECT host(framedipaddress) AS ip
       FROM radacct
@@ -541,6 +481,9 @@ const radiusRoutes: FastifyPluginAsync = async (app) => {
       LIMIT 1
     `.catch(() => [] as Array<{ ip: string }>);
     const lastIp = ipRow[0]?.ip ?? null;
+
+    const isNew = !existing;
+    const resetRejected = existing?.status === "rejected";
 
     const device = await prisma.userDevice.upsert({
       where: { userId_mac: { userId: user.id, mac: normalizedMac } },
@@ -558,11 +501,18 @@ const radiusRoutes: FastifyPluginAsync = async (app) => {
         manufacturer,
         deviceType,
         ...(lastIp ? { lastIp } : {}),
+        ...(resetRejected
+          ? { status: "pending" as const, telegramChatId: null, telegramMessageId: null }
+          : {}),
       },
     });
 
-    if (isNew) {
-      req.log.info({ username, mac: normalizedMac, deviceId: device.id, deviceType }, "radius.new_device");
+    if (!c.DEVICE_APPROVAL_REQUIRED || device.status === "approved") {
+      return reply.status(200).send({ ok: true, deviceId: device.id, isNew });
+    }
+
+    if (isNew || resetRejected) {
+      req.log.info({ username, mac: normalizedMac, deviceId: device.id, deviceType, isNew, resetRejected }, "radius.new_device");
       createPendingApproval(device.id, {
         username: user.username,
         fullName: user.fullName,
@@ -571,19 +521,24 @@ const radiusRoutes: FastifyPluginAsync = async (app) => {
       }).catch((err) => {
         req.log.error({ err, deviceId: device.id }, "telegram.send_approval_request failed");
       });
-
-      // Notify SSE subscribers so the admin dashboard reloads immediately
       emitPlatformEvent("device.pending", {
         deviceId: device.id,
         username: user.username,
         fullName: user.fullName,
         mac:      normalizedMac,
         nasIp,
-        isNew:    true,
+        isNew,
       });
     }
 
-    return reply.status(200).send({ ok: true, deviceId: device.id, isNew });
+    if (isNew) {
+      return rejectWithClass(reply, "unregistered-device", "Unregistered device");
+    }
+    if (resetRejected) {
+      return rejectWithClass(reply, "device-rejected", "Device rejected by admin");
+    }
+    req.log.info({ username, mac: normalizedMac, deviceStatus: device.status }, "radius.post-auth device_pending");
+    return rejectWithClass(reply, "device-pending", "Device pending approval");
   });
 };
 

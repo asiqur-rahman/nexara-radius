@@ -3,7 +3,9 @@
  * ops/docker-push.mjs
  *
  * Fetch the latest semver tag from Docker Hub, offer the next patch / minor /
- * major, then build and push nexara-api and nexara-web.
+ * major, then build and push nexara-api, nexara-web, and nexara-radius.
+ * Images are tagged with semver only (1.0.0, 1.0.1, …).
+ * CasaOS is pinned to a version in casaos-nexara-final.yml — bump it when you publish.
  *
  * Usage:
  *   make push
@@ -24,6 +26,7 @@ const ROOT = resolve(__dirname, "..");
 const DOCKER_USER = process.env.DOCKER_USER ?? "asiqurrahman";
 const API_IMAGE = `${DOCKER_USER}/nexara-api`;
 const WEB_IMAGE = `${DOCKER_USER}/nexara-web`;
+const RADIUS_IMAGE = `${DOCKER_USER}/nexara-radius`;
 const HUB_REPO = API_IMAGE; // version source of truth
 
 const SEMVER = /^v?(\d+)\.(\d+)\.(\d+)$/;
@@ -188,10 +191,10 @@ async function promptCustom() {
   return parsed.version;
 }
 
-function buildAndPush(image, dockerfile, tags) {
+function buildAndPush(image, dockerfile, tags, context = ".") {
   const tagArgs = tags.flatMap((t) => ["-t", `${image}:${t}`]);
   process.stdout.write(`\n${BOLD}Building ${image}${RESET}\n`);
-  runDocker(["build", "-f", dockerfile, ...tagArgs, "."]);
+  runDocker(["build", "-f", dockerfile, ...tagArgs, context]);
   process.stdout.write(`\n${BOLD}Pushing ${image}${RESET}\n`);
   for (const t of tags) runDocker(["push", `${image}:${t}`]);
 }
@@ -200,14 +203,14 @@ const sha = gitSha();
 
 process.stdout.write(`\n${BOLD}Nexara — Docker Hub push${RESET}\n\n`);
 info(`Registry : docker.io/${DOCKER_USER}`);
-info(`Images   : ${API_IMAGE}  ${WEB_IMAGE}`);
+info(`Images   : ${API_IMAGE}  ${WEB_IMAGE}  ${RADIUS_IMAGE}`);
 info(`Git SHA  : ${sha}`);
 info(`Docker   : ${docker.mode}`);
 
 const names = await fetchHubTags(HUB_REPO);
 const versions = names.map(parseSemver).filter(Boolean).sort(compareSemver);
 const last = versions.at(-1) ?? null;
-const other = names.filter((n) => !parseSemver(n));
+const other = names.filter((n) => n !== "latest" && !parseSemver(n));
 
 process.stdout.write(`\n${YELLOW}${BOLD}Docker Hub: ${HUB_REPO}${RESET}\n`);
 info(`Last version : ${last ? last.version : "none"}`);
@@ -216,11 +219,12 @@ if (!names.length) info(`${DIM}No tags on Hub yet — first publish will be 1.0.
 
 const next = bump(last);
 const version = await promptVersion(next, last);
-const tags = [version, "latest", "production", sha];
+const tags = [version];
 
 process.stdout.write(`\n${BOLD}Will tag and push as:${RESET}\n`);
 for (const t of tags) info(`${API_IMAGE}:${t}`);
 for (const t of tags) info(`${WEB_IMAGE}:${t}`);
+for (const t of tags) info(`${RADIUS_IMAGE}:${t}`);
 
 if (stdin.isTTY && !arg("version") && !process.env.VERSION) {
   const rl = createInterface({ input: stdin, output: stdout });
@@ -234,10 +238,12 @@ if (stdin.isTTY && !arg("version") && !process.env.VERSION) {
 
 buildAndPush(API_IMAGE, "apps/api/Dockerfile", tags);
 buildAndPush(WEB_IMAGE, "apps/web/Dockerfile", tags);
+buildAndPush(RADIUS_IMAGE, "infra/freeradius/Dockerfile", tags, "infra/freeradius");
 
 process.stdout.write("\n");
 ok("Pushed to Docker Hub");
 info(`${API_IMAGE}:${version}`);
 info(`${WEB_IMAGE}:${version}`);
+info(`${RADIUS_IMAGE}:${version}`);
 info(`https://hub.docker.com/r/${API_IMAGE}/tags`);
 info(`https://hub.docker.com/r/${WEB_IMAGE}/tags`);

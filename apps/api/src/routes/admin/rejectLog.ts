@@ -32,18 +32,31 @@ function normaliseMac(raw: string | null): string | null {
 }
 
 function deriveReason(
+  storedClass:  string | null,
   reply:        string,
   userExists:   boolean,
   deviceStatus: string | null,
+  hasMac:       boolean,
 ): string {
+  const code = (storedClass ?? "").trim().toLowerCase();
+  if (code === "wrong-password")     return "Wrong password";
+  if (code === "unknown-username")   return "Unknown username";
+  if (code === "unregistered-device") return "Unregistered device";
+  if (code === "device-pending")     return "Device pending approval";
+  if (code === "device-rejected")    return "Device rejected by admin";
+  if (code === "device-blocked")     return "Device permanently blocked";
+  if (code === "account-expired")    return "Account expired";
+  if (code === "account-inactive")   return "Account inactive";
+
+  // Legacy rows with no Class: infer carefully. Missing MAC is NOT
+  // "unregistered device" — that was hiding wrong-password rejects.
   if (!userExists) return "Unknown username";
+  if (!hasMac) return "Wrong password";
 
   if (deviceStatus === "blocked")  return "Device permanently blocked";
   if (deviceStatus === "rejected") return "Device rejected by admin";
   if (deviceStatus === "pending")  return "Device pending approval";
-  if (deviceStatus === "approved") return "Authentication failed (wrong password or certificate)";
-
-  // Device not in DB at all but username exists
+  if (deviceStatus === "approved") return "Wrong password";
   if (deviceStatus === null) return "Unregistered device";
 
   return reply || "Access-Reject";
@@ -74,6 +87,7 @@ const adminRejectLog: FastifyPluginAsync = async (app) => {
       callingstationid:string | null;
       calledstationid: string | null;
       authdate:        Date;
+      class:           string | null;
     };
 
     const searchClause = query.search
@@ -84,7 +98,8 @@ const adminRejectLog: FastifyPluginAsync = async (app) => {
     const [rows, countResult] = await Promise.all([
       prisma.$queryRawUnsafe<RawRow[]>(
         `SELECT rpa.id, rpa.username, rpa.reply,
-                rpa.callingstationid, rpa.calledstationid, rpa.authdate
+                rpa.callingstationid, rpa.calledstationid, rpa.authdate,
+                rpa.class
          FROM radpostauth rpa
          WHERE rpa.reply ILIKE '%reject%'
          ${searchClause}
@@ -138,7 +153,7 @@ const adminRejectLog: FastifyPluginAsync = async (app) => {
         mac:           mac,
         calledStation: row.calledstationid ?? null,
         reply:         row.reply ?? "Access-Reject",
-        reason:        deriveReason(row.reply ?? "", !!user, device?.status ?? null),
+        reason:        deriveReason(row.class, row.reply ?? "", !!user, device?.status ?? null, !!mac),
         authDate:      row.authdate.toISOString(),
         userId:        user?.id ?? null,
         fullName:      user?.fullName ?? null,

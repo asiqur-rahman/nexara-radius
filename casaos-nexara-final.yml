@@ -13,7 +13,7 @@ services:
     environment:
       - TZ=Asia/Dhaka
     hostname: nexara-web
-    image: asiqurrahman/nexara-web:latest
+    image: asiqurrahman/nexara-web:1.0.0
     labels:
       icon: https://cdn.jsdelivr.net/gh/asiqur-rahman/nexara-radius@main/docs/logo.svg
     restart: unless-stopped
@@ -57,15 +57,15 @@ services:
       - JWT_SECRET=nexara_jwt_secret_change_me_in_production_32ch
       - COOKIE_SECRET=nexara_cookie_secret_change_me_at_least_32
       - MFA_ENCRYPTION_KEY=dev_mfa_encryption_key_change_before_use_2026
-      - RADIUS_HOOK_SECRET=dev-hook-secret-change-in-prod
-      - CORS_ORIGINS=http://localhost:8123,https://radius.cloud.braintechsolution.com
+      - RADIUS_HOOK_SECRET=testing123
+      - CORS_ORIGINS=https://radius.cloud.braintechsolution.com
       - COOKIE_SECURE=false
       - NODE_OPTIONS=--openssl-legacy-provider
       - RADIUS_CA_CERT_PATH=/etc/raddb/certs-src/ca.pem
       - FREERADIUS_RELOAD_COMMAND=docker kill -s HUP nexara-radius
       - TZ=Asia/Dhaka
     hostname: nexara-api
-    image: asiqurrahman/nexara-api:latest
+    image: asiqurrahman/nexara-api:1.0.0
     labels:
       icon: https://cdn.jsdelivr.net/gh/asiqur-rahman/nexara-radius@main/docs/logo.svg
     restart: unless-stopped
@@ -196,12 +196,12 @@ services:
       - RADIUS_DB_PASSWORD=radius_dev_password_change_me
       - HOOK_HOST=nexara-api
       - HOOK_PORT=4000
-      - HOOK_SECRET=dev-hook-secret-change-in-prod
+      - HOOK_SECRET=testing123
       - ALLOW_DIRECT_MSCHAP=false
       - RADIUS_CERT_CN=radius.local
       - TZ=Asia/Dhaka
     hostname: nexara-radius
-    image: asiqurrahman/nexara-radius:latest
+    image: asiqurrahman/nexara-radius:1.0.0
     labels:
       icon: https://cdn.jsdelivr.net/gh/asiqur-rahman/nexara-radius@main/docs/logo.svg
     restart: unless-stopped
