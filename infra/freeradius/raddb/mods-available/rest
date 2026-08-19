@@ -31,7 +31,7 @@ rest {
         uri    = "http://$ENV{HOOK_HOST}:$ENV{HOOK_PORT}/api/v1/radius/post-auth?s=$ENV{HOOK_SECRET}"
         method = 'post'
         body   = 'json'
-        data   = '{"username":"%{User-Name}","mac":"%{outer.request:Calling-Station-Id}","nasIp":"%{NAS-IP-Address}","vlan":"%{reply:Tunnel-Private-Group-ID}"}'
+        data   = '{"username":"%{User-Name}","mac":"%{%{outer.request:Calling-Station-Id}:-%{Calling-Station-Id}}","nasIp":"%{NAS-IP-Address}","vlan":"%{reply:Tunnel-Private-Group-ID}"}'
     }
 
     # ── connection pool ──────────────────────────────────────────────

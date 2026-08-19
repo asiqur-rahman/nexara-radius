@@ -31,6 +31,21 @@ function normaliseMac(raw: string | null): string | null {
     .slice(0, 17);
 }
 
+function normalizeClass(raw: string | null): string {
+  if (!raw) return "";
+  let value = raw.trim().toLowerCase().replace(/^"+|"+$/g, "");
+  // FreeRADIUS sometimes stores Class as hex octets: \x756e72...
+  if (/^\\x[0-9a-f]+$/i.test(value) || /^[0-9a-f]{16,}$/.test(value)) {
+    const hex = value.startsWith("\\x") ? value.slice(2) : value;
+    try {
+      value = Buffer.from(hex, "hex").toString("utf8").trim().toLowerCase();
+    } catch {
+      // keep original
+    }
+  }
+  return value;
+}
+
 function deriveReason(
   storedClass:  string | null,
   reply:        string,
@@ -38,26 +53,22 @@ function deriveReason(
   deviceStatus: string | null,
   hasMac:       boolean,
 ): string {
-  const code = (storedClass ?? "").trim().toLowerCase();
-  if (code === "wrong-password")     return "Wrong password";
-  if (code === "unknown-username")   return "Unknown username";
-  if (code === "unregistered-device") return "Unregistered device";
-  if (code === "device-pending")     return "Device pending approval";
-  if (code === "device-rejected")    return "Device rejected by admin";
-  if (code === "device-blocked")     return "Device permanently blocked";
-  if (code === "account-expired")    return "Account expired";
-  if (code === "account-inactive")   return "Account inactive";
-
-  // Legacy rows with no Class: infer carefully. Missing MAC is NOT
-  // "unregistered device" — that was hiding wrong-password rejects.
+  const code = normalizeClass(storedClass);
+  if (code.includes("unregistered-device") || code === "unregistered") return "Unregistered device";
+  if (code.includes("device-pending") || code === "pending") return "Device pending approval";
+  if (code.includes("device-rejected")) return "Device rejected by admin";
+  if (code.includes("device-blocked"))  return "Device permanently blocked";
+  if (code.includes("unknown-username")) return "Unknown username";
+  if (code.includes("account-expired")) return "Account expired";
+  if (code.includes("account-inactive")) return "Account inactive";
   if (!userExists) return "Unknown username";
-  if (!hasMac) return "Wrong password";
-
+  if (code.includes("wrong-password")) return "Wrong password";
   if (deviceStatus === "blocked")  return "Device permanently blocked";
   if (deviceStatus === "rejected") return "Device rejected by admin";
   if (deviceStatus === "pending")  return "Device pending approval";
+  if (deviceStatus === null && hasMac) return "Unregistered device";
   if (deviceStatus === "approved") return "Wrong password";
-  if (deviceStatus === null) return "Unregistered device";
+  if (!hasMac) return "Wrong password";
 
   return reply || "Access-Reject";
 }

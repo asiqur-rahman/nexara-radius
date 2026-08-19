@@ -13,7 +13,7 @@ services:
     environment:
       - TZ=Asia/Dhaka
     hostname: nexara-web
-    image: asiqurrahman/nexara-web:1.0.1
+    image: asiqurrahman/nexara-web:1.0.3
     labels:
       icon: https://cdn.jsdelivr.net/gh/asiqur-rahman/nexara-radius@main/docs/logo.svg
     restart: unless-stopped
@@ -65,7 +65,7 @@ services:
       - FREERADIUS_RELOAD_COMMAND=docker kill -s HUP nexara-radius
       - TZ=Asia/Dhaka
     hostname: nexara-api
-    image: asiqurrahman/nexara-api:1.0.1
+    image: asiqurrahman/nexara-api:1.0.3
     labels:
       icon: https://cdn.jsdelivr.net/gh/asiqur-rahman/nexara-radius@main/docs/logo.svg
     restart: unless-stopped
@@ -200,7 +200,7 @@ services:
       - RADIUS_CERT_CN=radius.local
       - TZ=Asia/Dhaka
     hostname: nexara-radius
-    image: asiqurrahman/nexara-radius:1.0.1
+    image: asiqurrahman/nexara-radius:1.0.3
     labels:
       icon: https://cdn.jsdelivr.net/gh/asiqur-rahman/nexara-radius@main/docs/logo.svg
     restart: unless-stopped
@@ -305,7 +305,7 @@ x-casaos:
         en_US: Isolated bridge network shared by web, API, PostgreSQL, and FreeRADIUS
   tips:
     before_install:
-      en_US: Import this file as Nexara 1.0.1. If you already ran an older YAML,
+      en_US: Import this file as Nexara 1.0.3. If you already ran an older YAML,
         delete the app AND /DATA/AppData/nexara/postgres before importing, or the
         old database is reused and seed/NAS will not run. After start, sign in as
         asiq / @Shik. Open UDP 1812, 1813, and 3799 on the VPS firewall (TCP 8123

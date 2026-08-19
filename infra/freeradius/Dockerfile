@@ -20,10 +20,13 @@ COPY raddb/sites-available/inner-tunnel          /etc/raddb/sites-available/inne
 # Entrypoint — fixes cert permissions before radiusd starts.
 # Needed on Windows/WSL where bind-mounted files appear as 777.
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+COPY patch-postauth-query.sh /usr/local/bin/patch-postauth-query.sh
 
 # Fix permissions and enable modules + sites.
 RUN chmod -R go-w /etc/raddb \
  && chmod +x /usr/local/bin/docker-entrypoint.sh \
+ && chmod +x /usr/local/bin/patch-postauth-query.sh \
+ && /usr/local/bin/patch-postauth-query.sh \
  && ln -sf /etc/raddb/mods-available/sql            /etc/raddb/mods-enabled/sql \
  && ln -sf /etc/raddb/mods-available/rest           /etc/raddb/mods-enabled/rest \
  && ln -sf /etc/raddb/sites-available/default       /etc/raddb/sites-enabled/default \

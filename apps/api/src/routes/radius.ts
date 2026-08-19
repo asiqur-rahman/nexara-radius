@@ -106,8 +106,11 @@ function replyFromGroups(groups: UserGroupReplyShape[]): FlatRlmResponse {
 }
 
 function rejectWithClass(reply: FastifyReply, code: string, message: string) {
-  // HTTP 200 so rlm_rest applies reply:Class; inner-tunnel then `reject`s.
+  // HTTP 200 so rlm_rest applies attributes; inner-tunnel reads
+  // control:Tmp-String-1 for SQL + reject reason (reply:Class alone
+  // arrives as octets and string compares in unlang fail silently).
   return reply.status(200).send({
+    "control:Tmp-String-1": code,
     "reply:Class": code,
     "reply:Reply-Message": message,
   });
@@ -179,15 +182,20 @@ async function authorizePeap(
     },
   });
 
-  if (!user || user.status !== "active" || !user.secret) {
-    req.log.info({ username }, "radius.authorize user not found or inactive");
-    return reply.status(404).send({ error: "User not found" });
+  if (!user || !user.secret) {
+    req.log.info({ username }, "radius.authorize user not found");
+    return rejectWithClass(reply, "unknown-username", "Unknown username");
+  }
+
+  if (user.status !== "active") {
+    req.log.info({ username, status: user.status }, "radius.authorize user inactive");
+    return rejectWithClass(reply, "account-inactive", "Account inactive");
   }
 
   // Enforce validUntil expiry — status=active does not imply unexpired.
   if (user.validUntil && user.validUntil < new Date()) {
     req.log.info({ username, validUntil: user.validUntil }, "radius.authorize user account expired");
-    return reply.status(403).send({ error: "Account expired" });
+    return rejectWithClass(reply, "account-expired", "Account expired");
   }
 
   const ntHash = user.secret.ntHash;

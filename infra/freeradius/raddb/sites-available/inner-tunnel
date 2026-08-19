@@ -36,14 +36,18 @@ server inner-tunnel {
         }
 
         rest
-        # In FreeRADIUS 3.2.x unlang, "if (rest != ok && rest != updated)"
-        # unexpectedly evaluates to TRUE even when rest returns "updated".
-        # Explicitly enumerate the failure rcodes instead.
-        if (rest == fail || rest == reject || rest == notfound || rest == invalid) {
-            if (!&reply:Class) {
-                update reply {
-                    &Class := "unknown-username"
-                }
+        # Authorize hook returns control:Tmp-String-1 on HTTP 200 for unknown users.
+        if (&control:Tmp-String-1 == "unknown-username" || \
+            &control:Tmp-String-1 == "account-expired" || \
+            &control:Tmp-String-1 == "account-inactive") {
+            update reply {
+                &Class := "%{control:Tmp-String-1}"
+            }
+            update session-state {
+                &Class := "%{control:Tmp-String-1}"
+            }
+            update outer.session-state {
+                &Class := "%{control:Tmp-String-1}"
             }
             reject
         }
@@ -86,20 +90,30 @@ server inner-tunnel {
         }
 
         rest
-        # Device policy runs here (after MSCHAPv2 succeeded). The API sets
-        # reply:Class to unregistered-device / device-pending / etc.
-        if (&reply:Class == "unregistered-device" || \
-            &reply:Class == "device-pending" || \
-            &reply:Class == "device-rejected" || \
-            &reply:Class == "device-blocked" || \
-            &reply:Class == "unknown-username") {
+        # API returns control:Tmp-String-1 for device-policy rejects.
+        if (&control:Tmp-String-1 == "unregistered-device" || \
+            &control:Tmp-String-1 == "device-pending" || \
+            &control:Tmp-String-1 == "device-rejected" || \
+            &control:Tmp-String-1 == "device-blocked" || \
+            &control:Tmp-String-1 == "unknown-username" || \
+            &control:Tmp-String-1 == "account-expired" || \
+            &control:Tmp-String-1 == "account-inactive") {
+            update outer.session-state {
+                &Class := "%{control:Tmp-String-1}"
+            }
             reject
         }
         if (rest == fail || rest == reject || rest == notfound || rest == invalid) {
-            if (!&reply:Class) {
-                update reply {
-                    &Class := "unregistered-device"
+            if (!&control:Tmp-String-1) {
+                update control {
+                    &Tmp-String-1 := "unknown-username"
                 }
+            }
+            update reply {
+                &Class := "%{control:Tmp-String-1}"
+            }
+            update outer.session-state {
+                &Class := "%{control:Tmp-String-1}"
             }
             reject
         }
@@ -107,11 +121,6 @@ server inner-tunnel {
         sql
 
         Post-Auth-Type REJECT {
-            # Snapshot Class before attr_filter.access_reject strips it.
-            update control {
-                &Tmp-String-1 := "%{reply:Class}"
-            }
-
             attr_filter.access_reject
 
             update request {
@@ -119,21 +128,31 @@ server inner-tunnel {
                 &Called-Station-Id := "%{outer.request:Called-Station-Id}"
             }
 
-            if (&control:Tmp-String-1 && &control:Tmp-String-1 != "") {
-                update reply {
-                    &Class := "%{control:Tmp-String-1}"
+            if (!&control:Tmp-String-1) {
+                if (&session-state:Class) {
+                    update control {
+                        &Tmp-String-1 := "%{session-state:Class}"
+                    }
+                }
+                else {
+                    if (&reply:Class) {
+                        update control {
+                            &Tmp-String-1 := "%{reply:Class}"
+                        }
+                    }
+                    else {
+                        update control {
+                            &Tmp-String-1 := "wrong-password"
+                        }
+                    }
                 }
             }
-            elsif (!&reply:Class) {
-                # MSCHAPv2 failed — password did not match.
-                update reply {
-                    &Class := "wrong-password"
-                }
+            update reply {
+                &Class := "%{control:Tmp-String-1}"
             }
-
             update outer.session-state {
                 &Module-Failure-Message := &request:Module-Failure-Message
-                &Class := &reply:Class
+                &Class := "%{control:Tmp-String-1}"
             }
 
             sql

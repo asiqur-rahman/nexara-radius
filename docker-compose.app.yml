@@ -13,7 +13,7 @@ services:
     build:
       context: .
       dockerfile: apps/api/Dockerfile
-    image: asiqurrahman/nexara-api:1.0.1
+    image: asiqurrahman/nexara-api:1.0.3
     container_name: nexara-api
     restart: unless-stopped
     env_file:
@@ -51,7 +51,7 @@ services:
     build:
       context: .
       dockerfile: apps/web/Dockerfile
-    image: asiqurrahman/nexara-web:1.0.1
+    image: asiqurrahman/nexara-web:1.0.3
     container_name: nexara-web
     restart: unless-stopped
     depends_on:

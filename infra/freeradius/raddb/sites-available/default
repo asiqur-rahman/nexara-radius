@@ -113,9 +113,27 @@ server default {
         exec
 
         Post-Auth-Type REJECT {
-            attr_filter.access_reject
-            eap
-            sql
+            # Inner-tunnel already logged the real user. Skip PEAP outer
+            # identity "anonymous" or we get a second row with no MAC/Class.
+            if (&User-Name == "anonymous") {
+                attr_filter.access_reject
+                eap
+            }
+            else {
+                if (&session-state:Class) {
+                    update control {
+                        &Tmp-String-1 := "%{session-state:Class}"
+                    }
+                }
+                attr_filter.access_reject
+                if (&control:Tmp-String-1) {
+                    update reply {
+                        &Class := "%{control:Tmp-String-1}"
+                    }
+                }
+                eap
+                sql
+            }
         }
     }
 
